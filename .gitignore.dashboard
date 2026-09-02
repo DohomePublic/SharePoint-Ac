@@ -1,0 +1,5 @@
+# เพิ่มบรรทัดเหล่านี้เข้า .gitignore เดิมของ repo (อย่าทับไฟล์เดิม)
+node_modules/
+*.local.json
+dashboard/*.tmp.html
+export*.csv
