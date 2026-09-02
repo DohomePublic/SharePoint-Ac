@@ -442,11 +442,11 @@ async function loadData(){
       $("#modeNote").textContent =
         MODE==="LIVE"   ? "LIVE — ดึงสดจาก SharePoint REST API" :
         MODE==="GITHUB" ? ("GitHub — " + (GH.endpoint||"data.json") + (GH.builtAt?(" · ข้อมูล build เมื่อ "+GH.builtAt):"")) :
-                          "SNAPSHOT — ข้อมูลที่ฝังในไฟล์ ณ 2026-09-02 07:12 UTC";
+                          "SNAPSHOT — ข้อมูลที่ฝังในไฟล์ ณ 2026-09-02 09:19 UTC";
       if(errs.length){
         const auto = (($("#srcMode")&&$("#srcMode").value)||"auto")==="auto";
         if(auto && MODE==="SNAPSHOT")
-          showInfo("ออฟไลน์/เข้าถึงแหล่งข้อมูลออนไลน์ไม่ได้ — กำลังแสดงข้อมูลที่ฝังในไฟล์ (ณ 2026-09-02 07:12 UTC) · กดรีเฟรชเพื่อลองดึงจาก GitHub อีกครั้ง");
+          showInfo("ออฟไลน์/เข้าถึงแหล่งข้อมูลออนไลน์ไม่ได้ — กำลังแสดงข้อมูลที่ฝังในไฟล์ (ณ 2026-09-02 09:19 UTC) · กดรีเฟรชเพื่อลองดึงจาก GitHub อีกครั้ง");
         else
           showErr("ใช้แหล่งสำรอง ("+MODE+") เพราะแหล่งก่อนหน้าล้มเหลว: "+errs.join(" | "));
       }
