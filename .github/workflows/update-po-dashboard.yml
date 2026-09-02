@@ -1,0 +1,142 @@
+name: Update PO Approval Dashboard
+
+on:
+  schedule:
+    # cron เป็น UTC เสมอ — 01:00 UTC = 08:00 น. เวลาไทย
+    - cron: '0 1 * * *'          # ทุกวัน 08:00 น. เวลาไทย
+    - cron: '0 5,9,13 * * 1-6'   # เพิ่มรอบ 12:00 / 16:00 / 20:00 น. จันทร์–เสาร์
+  workflow_dispatch:             # กดรันเองได้จาก GitHub UI
+    inputs:
+      force:
+        description: 'ข้ามการตรวจข้อมูลหดผิดปกติ'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: po-dashboard
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: ตรวจว่าไฟล์ที่จำเป็นอยู่ครบ
+        run: |
+          MISSING=""
+          for f in scripts/build_dashboard.py dashboard/template.html ; do
+            [ -f "$f" ] || MISSING="$MISSING $f"
+          done
+          if [ -n "$MISSING" ]; then
+            {
+              echo "## ❌ ไฟล์ไม่ครบ"
+              echo ""
+              echo "ไม่พบไฟล์:$MISSING"
+              echo ""
+              echo "**วิธีแก้:** Add file → Upload files → ลากโฟลเดอร์ \`scripts\` และ \`dashboard\` จาก zip มาวาง"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::ไม่พบไฟล์:$MISSING"
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch SharePoint data & build dashboard
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          SP_HOSTNAME: dohomegroup.sharepoint.com
+          SP_SITE_PATH: /sites/AC-Accounting
+          SP_LIST_TITLE: 'AC-Data Request for approval of PO'
+          FORCE_BUILD: ${{ inputs.force }}
+        run: python scripts/build_dashboard.py
+
+      - name: สรุปผลลง Job Summary
+        if: always()
+        run: |
+          if [ -f dashboard/build-report.json ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          r = json.load(open('dashboard/build-report.json'))
+          src = {'graph':'SharePoint (Microsoft Graph)','csv':'ไฟล์ CSV','data.json':'ข้อมูลเดิม (ไม่มี secrets)'}
+          print('## 📊 ผลการอัปเดตแดชบอร์ดอนุมัติ PO\n')
+          print('| รายการ | ค่า |')
+          print('|---|---|')
+          print(f"| แหล่งข้อมูล | {src.get(r['source'], r['source'])} |")
+          print(f"| จำนวนรายการ | **{r['rows']:,}** |")
+          print(f"| เทียบครั้งก่อน | {r['previousRows']:,} → {r['rows']:,} ({r['delta']:+,}) |")
+          print(f"| รายการใหม่สุด | {r['latestCreatedBkk']} น. (เวลาไทย) · เลขที่คำขอ {r['latestTitle']} · ID {r['latestId']} |")
+          print(f"| วันล่าสุดที่มีคำขอ | {r['lastDay']} จำนวน {r['lastDayCount']:,} รายการ |")
+          print(f"| วันนี้ ({r['todayBkk']}) | {r['todayCount']:,} รายการ |")
+          print(f"| ใช้เวลา | {r['tookSec']} วินาที |")
+          print(f"| ขนาด index.html | {r['htmlBytes']:,} bytes |")
+          print('\n### สถานะ\n')
+          print('| สถานะ | จำนวน |')
+          print('|---|---:|')
+          for k, v in r['byStatus']:
+              print(f"| {k} | {v:,} |")
+          PY
+          fi
+
+      - name: Commit and push updated dashboard
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html dashboard/index.html dashboard/data.json dashboard/build-report.json
+          if git diff --staged --quiet; then
+            echo "ℹ ข้อมูลไม่เปลี่ยน ไม่ต้อง commit"
+          else
+            git commit -m "Auto-update PO Approval Dashboard $(TZ=Asia/Bangkok date +'%Y-%m-%d %H:%M น.')"
+            for i in 1 2 3; do
+              git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push && break
+              echo "↻ push ไม่สำเร็จ ลองใหม่ครั้งที่ $i"; sleep 5
+            done
+          fi
+
+      - name: เก็บเป็น artifact (ดาวน์โหลดได้จากหน้า run)
+        uses: actions/upload-artifact@v4
+        with:
+          name: po-approval-dashboard
+          path: |
+            index.html
+            dashboard/data.json
+            dashboard/build-report.json
+          retention-days: 30
+
+      - name: เตรียมไฟล์ให้ GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard
+
+  deploy-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: แสดงลิงก์แดชบอร์ด
+        run: |
+          echo "## 🌐 แดชบอร์ดออนไลน์แล้ว" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "เปิดที่: **${{ steps.deployment.outputs.page_url }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> ถ้าขึ้น 404 ให้ไปที่ Settings → Pages → Source แล้วเลือก **GitHub Actions**" >> "$GITHUB_STEP_SUMMARY"
