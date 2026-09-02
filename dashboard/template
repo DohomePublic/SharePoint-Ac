@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PO Approval Dashboard | AC-Data Request for approval of PO</title>
+<style>
+:root{
+  --bg:#f4f6fb; --panel:#ffffff; --panel-2:#fbfcfe; --line:#e3e8f0; --txt:#1b2436; --muted:#6b7688;
+  --brand:#e2231a; --brand-2:#b81a13; --ok:#12a150; --warn:#e08a00; --bad:#d92d20; --info:#2563eb;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.06); --r:14px;
+}
+html[data-theme="dark"]{
+  --bg:#0e1420; --panel:#151d2c; --panel-2:#1a2333; --line:#26314a; --txt:#e7ecf5; --muted:#95a1b6;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:"Segoe UI","Sarabun",Tahoma,sans-serif;font-size:14px}
+a{color:var(--info)}
+header.top{position:sticky;top:0;z-index:30;background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;box-shadow:var(--shadow)}
+header.top h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px}
+header.top .sub{font-size:11.5px;opacity:.9}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--txt);border-radius:10px;padding:7px 12px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--panel-2)}
+.btn.primary{background:#fff;color:var(--brand);border-color:transparent;font-weight:600}
+.btn.ghost{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.wrap{padding:14px;max-width:1800px;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow);cursor:pointer;transition:.15s}
+.card:hover{transform:translateY(-2px)}
+.card .k{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.card .v{font-size:24px;font-weight:800;margin-top:4px}
+.card .d{font-size:11.5px;color:var(--muted);margin-top:2px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:12px}
+.panel .hd{padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.panel .bd{padding:12px 14px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+label.f{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px}
+input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--txt);font-family:inherit;font-size:13px}
+input:focus,select:focus{outline:2px solid rgba(226,35,26,.25);border-color:var(--brand)}
+.searchbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.searchbar input{flex:1;min-width:220px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center}
+.chip b{font-weight:600}
+.chip span.x{cursor:pointer;color:var(--bad);font-weight:700}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.charts .panel.wide{grid-column:1/-1}
+svg.ch{width:100%;height:auto;display:block;overflow:visible}
+svg.ch text{font-family:inherit;fill:var(--muted)}
+svg.ch .lab{font-size:10.5px}
+svg.ch .val{font-size:11px;font-weight:700;fill:var(--fg)}
+svg.ch .big{font-size:22px;font-weight:800;fill:var(--fg)}
+svg.ch .sm{font-size:10px}
+svg.ch .hit{cursor:pointer}
+svg.ch .hit:hover{opacity:.78}
+svg.ch .gl{stroke:var(--bd);stroke-width:1;stroke-dasharray:3 3}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.fresh{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--bd);border-left:4px solid var(--info);
+  padding:9px 13px;border-radius:var(--r);margin-bottom:12px;font-size:12.5px}
+.fresh.warnbar{border-left-color:var(--warn)}
+.fresh b{color:var(--fg)}
+.statline{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.statline b{color:var(--fg);font-size:14px}
+.tablewrap{overflow:auto;max-height:64vh;border-radius:0 0 var(--r) var(--r)}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1200px;font-size:13px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel-2);z-index:5;cursor:pointer;user-select:none;font-size:12px;color:var(--muted);font-weight:700}
+th:hover{color:var(--txt)}
+th .ar{opacity:.5;font-size:10px}
+tbody tr:hover{background:var(--panel-2)}
+td.wrapcell{white-space:normal;max-width:320px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+.b-ok{background:rgba(18,161,80,.12);color:var(--ok);border-color:rgba(18,161,80,.3)}
+.b-wait{background:rgba(224,138,0,.12);color:var(--warn);border-color:rgba(224,138,0,.3)}
+.b-bad{background:rgba(217,45,32,.12);color:var(--bad);border-color:rgba(217,45,32,.3)}
+.b-none{background:rgba(107,118,136,.12);color:var(--muted);border-color:rgba(107,118,136,.3)}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 14px;flex-wrap:wrap;border-top:1px solid var(--line)}
+.muted{color:var(--muted)}
+.drawer{position:fixed;inset:0;background:rgba(9,13,22,.45);display:none;z-index:60}
+.drawer.open{display:block}
+.drawer .sheet{position:absolute;right:0;top:0;height:100%;width:min(560px,100%);background:var(--panel);box-shadow:var(--shadow);overflow:auto;padding:16px;animation:slide .18s ease}
+@keyframes slide{from{transform:translateX(30px);opacity:.4}to{transform:none;opacity:1}}
+.kv{display:grid;grid-template-columns:170px 1fr;gap:6px 10px;font-size:13px}
+.kv div.k{color:var(--muted)}
+.steps{display:flex;flex-direction:column;gap:10px;margin:12px 0}
+.step{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel-2)}
+.step h4{margin:0 0 6px;font-size:13px}
+.bar{height:10px;border-radius:6px;background:var(--panel-2);overflow:hidden;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;background:var(--brand)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:#111827;color:#fff;padding:10px 16px;border-radius:10px;z-index:90;display:none;font-size:13px}
+.rowlist{display:grid;grid-template-columns:1fr auto;gap:6px;font-size:12.5px}
+.rowlist .n{color:var(--muted)}
+@media(max-width:720px){
+  table{min-width:760px}
+  .card .v{font-size:20px}
+  .wrap{padding:10px}
+}
+@media print{header.top,.filters,.pager,.btn,.panel.noprint{display:none!important}.tablewrap{max-height:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>PO Approval Dashboard</h1>
+    <div class="sub">AC-Data Request for approval of PO &middot; DOHOME</div>
+  </div>
+  <div class="spacer"></div>
+  <span class="chip" id="srcChip" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">กำลังโหลด…</span>
+  <select id="srcMode" class="btn ghost" title="เลือกแหล่งข้อมูล" style="width:auto;background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)">
+    <option value="auto" selected>แหล่งข้อมูล: อัตโนมัติ</option>
+    <option value="github">แหล่งข้อมูล: GitHub</option>
+    <option value="sp">แหล่งข้อมูล: SharePoint สด</option>
+    <option value="snap">แหล่งข้อมูล: ในไฟล์นี้</option>
+  </select>
+  <button class="btn ghost" id="btnRefresh" title="ดึงข้อมูลล่าสุดใหม่อีกครั้ง">🔄 รีเฟรช</button>
+  <select id="autoRef" class="btn ghost" style="width:auto;background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35)">
+    <option value="0">Auto: ปิด</option>
+    <option value="60">Auto: 1 นาที</option>
+    <option value="300" selected>Auto: 5 นาที</option>
+    <option value="900">Auto: 15 นาที</option>
+  </select>
+  <button class="btn ghost" id="btnTheme">🌗</button>
+</header>
+
+<div class="wrap">
+  <div id="errBar" style="display:none;background:rgba(217,45,32,.1);border:1px solid rgba(217,45,32,.4);color:var(--bad);padding:10px 14px;border-radius:var(--r);margin-bottom:12px;font-size:13px"></div>
+  <div class="fresh" id="freshBar" style="display:none"></div>
+  <div class="cards" id="kpis"></div>
+
+  <div class="panel noprint">
+    <div class="hd">🔍 ค้นหาและกรองข้อมูล
+      <span class="spacer"></span>
+      <button class="btn" id="btnClear">ล้างตัวกรอง</button>
+      <button class="btn" id="btnCsv">⬇ Export CSV</button>
+      <button class="btn" id="btnXls">⬇ Export Excel</button>
+      <button class="btn" id="btnJson">⬇ JSON</button>
+      <button class="btn" id="btnPrint">🖨 พิมพ์/PDF</button>
+    </div>
+    <div class="bd">
+      <div class="searchbar">
+        <input id="q" placeholder="ค้นหาบางส่วน: เลขที่คำขอ, PR Number, รหัสพนักงาน, ชื่อผู้ขอ, ผู้อนุมัติ, สาขา, แผนก, หมายเหตุ…" />
+        <label class="chip"><input type="checkbox" id="onlyAtt" style="width:auto"/> เฉพาะที่มีไฟล์แนบ</label>
+      </div>
+      <div class="filters" style="margin-top:10px">
+        <div><label class="f">สถานะรวม (Status)</label><select id="fStatus"></select></div>
+        <div><label class="f">สถานะหัวหน้าสายงาน</label><select id="fSDept"></select></div>
+        <div><label class="f">สถานะศูนย์จัดซื้อทรัพย์สิน</label><select id="fSProc"></select></div>
+        <div><label class="f">สถานะบัญชีทรัพย์สิน</label><select id="fSAsset"></select></div>
+        <div><label class="f">แผนก (Department)</label><select id="fDept"></select></div>
+        <div><label class="f">สาขา / Site</label><select id="fSite"></select></div>
+        <div><label class="f">ผู้ขอ (user name)</label><select id="fUser"></select></div>
+        <div><label class="f">ผู้อนุมัติหัวหน้าสายงาน</label><select id="fApprover"></select></div>
+        <div><label class="f">ผู้อนุมัติศูนย์จัดซื้อ</label><select id="fProcName"></select></div>
+        <div><label class="f">วันที่สร้าง ตั้งแต่</label><input type="date" id="fFrom"/></div>
+        <div><label class="f">วันที่สร้าง ถึง</label><input type="date" id="fTo"/></div>
+        <div><label class="f">ช่วงเวลาแบบเร็ว</label><select id="fQuick">
+          <option value="">ทั้งหมด</option><option value="7">7 วันล่าสุด</option><option value="30">30 วันล่าสุด</option>
+          <option value="90">90 วันล่าสุด</option><option value="365">1 ปีล่าสุด</option></select></div>
+      </div>
+      <div class="chips" id="activeChips"></div>
+    </div>
+  </div>
+
+  <div class="panel noprint" style="margin-bottom:12px">
+    <div class="hd">📊 แดชบอร์ดสรุปแบบกราฟ
+      <span class="muted" style="font-size:11.5px;font-weight:400">— คำนวณตามตัวกรองปัจจุบัน · คลิกที่กราฟเพื่อกรองต่อ</span>
+      <span class="spacer"></span>
+      <select id="chDays" style="width:auto"><option value="14">รายวัน 14 วัน</option><option value="30" selected>รายวัน 30 วัน</option><option value="60">รายวัน 60 วัน</option><option value="90">รายวัน 90 วัน</option></select>
+      <button class="btn" id="btnChToggle">ซ่อนกราฟ</button>
+    </div>
+  </div>
+  <div class="charts noprint" id="chartArea">
+    <div class="panel wide"><div class="hd">📅 จำนวนคำขอรายวัน (ล่าสุดอยู่ขวาสุด)</div><div class="bd"><div id="chDaily"></div></div></div>
+    <div class="panel"><div class="hd">🍩 สัดส่วนตามสถานะรวม</div><div class="bd"><div id="chDonut"></div></div></div>
+    <div class="panel"><div class="hd">🪜 ผลการพิจารณาแต่ละขั้น</div><div class="bd"><div id="chFunnel"></div></div></div>
+    <div class="panel"><div class="hd">⏱ ระยะเวลาอนุมัติ (ชั่วโมง)</div><div class="bd"><div id="chLead"></div></div></div>
+    <div class="panel wide"><div class="hd">📈 คำขอต่อเดือน (12 เดือนล่าสุด)</div><div class="bd"><div id="chMonth"></div></div></div>
+    <div class="panel"><div class="hd">🏢 Top 10 สาขา / Site</div><div class="bd" id="chSite"></div></div>
+    <div class="panel"><div class="hd">🏷 Top 10 แผนก</div><div class="bd" id="chDept"></div></div>
+    <div class="panel"><div class="hd">👤 Top 10 ผู้ขอ</div><div class="bd" id="chUser"></div></div>
+    <div class="panel"><div class="hd">✅ ผู้อนุมัติศูนย์จัดซื้อ</div><div class="bd" id="chProc"></div></div>
+    <div class="panel"><div class="hd">📌 สถานะรวม (รายการ)</div><div class="bd" id="chStatus"></div></div>
+    <div class="panel"><div class="hd">🕒 คำขอตามช่วงเวลาของวัน (เวลาไทย)</div><div class="bd"><div id="chHour"></div></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="hd">📋 รายการคำขออนุมัติ PO
+      <span class="spacer"></span>
+      <span class="muted" id="cnt"></span>
+      <select id="pageSize" style="width:auto"><option>25</option><option selected>50</option><option>100</option><option>200</option></select>
+    </div>
+    <div class="tablewrap"><table id="tbl"><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="pager">
+      <button class="btn" id="pFirst">« แรก</button><button class="btn" id="pPrev">‹ ก่อนหน้า</button>
+      <span id="pInfo" class="muted"></span>
+      <button class="btn" id="pNext">ถัดไป ›</button><button class="btn" id="pLast">ท้ายสุด »</button>
+    </div>
+  </div>
+  <div class="muted" style="font-size:11.5px;padding:0 2px 20px">
+    แหล่งข้อมูล: SharePoint List <a href="https://dohomegroup.sharepoint.com/sites/AC-Accounting/Lists/ACData%20Request%20for%20approval%20of%20PO/AllItems.aspx" target="_blank">AC-Data Request for approval of PO</a>
+    · โหมดข้อมูล: <span id="modeNote"></span>
+  </div>
+</div>
+
+<div class="drawer" id="drawer"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<!-- ข้อมูลสำรอง (dictionary-encoded JSON) ต้องอยู่ "ก่อน" สคริปต์หลักเสมอ -->
+<script type="application/json" id="snap">__SNAPSHOT_JSON__</script>
+
+<script>
+/* ============================================================
+   PO Approval Dashboard — single-file
+   Data modes:
+   1) LIVE  : เมื่อวางไฟล์นี้ไว้ใน SharePoint site (SiteAssets) จะดึงข้อมูลสดผ่าน REST API
+              โดย map Display Name -> Internal Name จาก /fields ไม่มีการเดาชื่อคอลัมน์
+   2) SNAPSHOT: ข้อมูลสำรอง (embedded, gzip+base64) ใช้เมื่อเปิดไฟล์นอก SharePoint
+   ============================================================ */
+const LIST_TITLE = "AC-Data Request for approval of PO";
+const SITE_URL   = "https://dohomegroup.sharepoint.com/sites/AC-Accounting";
+const LIST_WEB_URL = SITE_URL + "/Lists/ACData%20Request%20for%20approval%20of%20PO";
+
+/* ---- GitHub เป็นแหล่งข้อมูล: ปุ่ม "รีเฟรช" จะดึง data.json ล่าสุดจาก GitHub ---- */
+const GH = {
+  owner : "DohomePublic",
+  repo  : "SharePoint-Ac",
+  branch: "main",
+  path  : "dashboard/data.json"           // ไฟล์ที่ workflow สร้างและ commit ให้อัตโนมัติ
+};
+/* ลองหลาย endpoint ตามลำดับ: ไฟล์ข้าง ๆ (Pages) -> raw.githubusercontent -> jsDelivr CDN */
+function ghUrls(){
+  const bust = "?v=" + Date.now();
+  return [
+    "data.json" + bust,
+    `https://raw.githubusercontent.com/${GH.owner}/${GH.repo}/${GH.branch}/${GH.path}${bust}`,
+    `https://cdn.jsdelivr.net/gh/${GH.owner}/${GH.repo}@${GH.branch}/${GH.path}${bust}`
+  ];
+}
+
+/* Display names ตาม schema จริงของ List */
+const F = {
+  id:"_ID", title:"Title", empId:"id number", user:"user name", dept:"Department", pr:"PR Number",
+  note:"Additional Notes", nDept:"Name Department Head", tDept:"Time Department Head", sDept:"Status Department Head",
+  nProc:"Name Head of Procurement Center", tProc:"Time Head of Procurement Center", sProc:"Status Head of Procurement Center",
+  status:"Status", nAsset:"Name Asset Register", tAsset:"Time Asset Register", sAsset:"Status Asset Register",
+  email:"Email User", site:"Site", cDept:"Comment Department Head", cProc:"Comment Head Procurement Center",
+  cAsset:"Comment Asset ", created:"Created", modified:"Modified", att:"_HasAttachments"
+};
+const COLUMNS = [
+  {k:F.title, label:"เลขที่คำขอ", w:90},
+  {k:F.pr,    label:"PR Number", w:120},
+  {k:F.empId, label:"รหัสพนักงาน", w:100},
+  {k:F.user,  label:"ผู้ขอ"},
+  {k:F.dept,  label:"แผนก"},
+  {k:F.site,  label:"สาขา / Site"},
+  {k:F.status,label:"สถานะรวม", type:"badge"},
+  {k:F.sDept, label:"หัวหน้าสายงาน", type:"badge"},
+  {k:F.nDept, label:"ผู้อนุมัติสายงาน"},
+  {k:F.sProc, label:"ศูนย์จัดซื้อทรัพย์สิน", type:"badge"},
+  {k:F.nProc, label:"ผู้อนุมัติจัดซื้อ"},
+  {k:F.sAsset,label:"บัญชีทรัพย์สิน", type:"badge"},
+  {k:F.created,label:"วันที่สร้าง", type:"dt"},
+  {k:F.modified,label:"แก้ไขล่าสุด", type:"dt"},
+  {k:F.note,  label:"หมายเหตุ", type:"wrap"},
+  {k:F.att,   label:"ไฟล์แนบ", type:"att"}
+];
+
+let RAW = [], VIEW = [], page = 1, sortKey = F.created, sortDir = -1, timer = null, MODE = "";
+
+/* ---------- utils ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm = s => String(s==null?"":s).toLowerCase().trim();
+function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(t._h);t._h=setTimeout(()=>t.style.display="none",2600);}
+/* ===== เวลา: แสดงและจัดกลุ่มด้วยเวลาไทย (Asia/Bangkok, UTC+7) เสมอ
+   เพื่อให้ตรงกับที่เห็นใน SharePoint ไม่ว่าเครื่องผู้ใช้จะตั้งโซนเวลาใด ===== */
+const TZ_OFFSET_MS = 7*3600*1000;
+const p2 = n => String(n).padStart(2,"0");
+/* Date -> ชิ้นส่วนเวลาไทย */
+function bkkParts(d){ const t=new Date(d.getTime()+TZ_OFFSET_MS);
+  return {y:t.getUTCFullYear(),m:t.getUTCMonth()+1,d:t.getUTCDate(),H:t.getUTCHours(),M:t.getUTCMinutes()}; }
+/* แปลงค่าเวลาจาก List:
+   - Created / Modified : ISO UTC (…Z)
+   - Time Department Head / Procurement / Asset : ข้อความ d/M/yyyy HH:mm เวลาไทย (บางแถวมีวินาที) */
+function dOnly(v){
+  if(v==null||v==="") return null;
+  if(v instanceof Date) return isNaN(v)?null:v;
+  const s=String(v).trim();
+  const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if(m){
+    let a=+m[1], b=+m[2]; const y=+m[3], H=+m[4], M=+m[5], S=+(m[6]||0);
+    let day=a, mon=b; if(mon>12){ day=b; mon=a; }          // กันรูปแบบ M/d/yyyy
+    if(mon<1||mon>12||day<1||day>31) return null;
+    const t=Date.UTC(y,mon-1,day,H,M,S)-TZ_OFFSET_MS;      // ข้อความเป็นเวลาไทย -> UTC
+    return isNaN(t)?null:new Date(t);
+  }
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+function dt(v){ const d=dOnly(v); if(!d) return v?String(v):"";
+  const k=bkkParts(d); return `${p2(k.d)}/${p2(k.m)}/${k.y} ${p2(k.H)}:${p2(k.M)}`; }
+/* คีย์วันแบบไทย "YYYY-MM-DD" สำหรับกรอง/จัดกลุ่ม */
+function dayKey(v){ const d=dOnly(v); if(!d) return ""; const k=bkkParts(d); return `${k.y}-${p2(k.m)}-${p2(k.d)}`; }
+function monthKey(v){ const d=dOnly(v); if(!d) return ""; const k=bkkParts(d); return `${k.y}-${p2(k.m)}`; }
+function todayKeyBkk(){ const k=bkkParts(new Date()); return `${k.y}-${p2(k.m)}-${p2(k.d)}`; }
+function shiftKey(key,days){ const [y,m,d]=key.split("-").map(Number);
+  const t=new Date(Date.UTC(y,m-1,d)); t.setUTCDate(t.getUTCDate()+days);
+  return `${t.getUTCFullYear()}-${p2(t.getUTCMonth()+1)}-${p2(t.getUTCDate())}`; }
+function badge(v){
+  const s=String(v||"").trim();
+  if(!s) return '<span class="badge b-none">—</span>';
+  if(/^อนุมัติ$|ดำเนินการเรียบร้อย/.test(s)) return `<span class="badge b-ok">${esc(s)}</span>`;
+  if(/^ไม่อนุมัติ$|ยกเลิก/.test(s)) return `<span class="badge b-bad">${esc(s)}</span>`;
+  if(/^รอ/.test(s)) return `<span class="badge b-wait">${esc(s)}</span>`;
+  return `<span class="badge b-none">${esc(s)}</span>`;
+}
+const itemUrl = id => LIST_WEB_URL + "/DispForm.aspx?ID=" + id;
+
+/* ---------- data loading ---------- */
+async function spFetch(url){
+  const r = await fetch(url,{headers:{Accept:"application/json;odata=nometadata"},credentials:"include"});
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+function webUrl(){
+  const m = location.pathname.match(/^(.*?\/sites\/[^\/]+)/i);
+  return m ? location.origin + m[1] : SITE_URL;
+}
+async function loadLive(){
+  const base = webUrl();
+  const lu = `${base}/_api/web/lists/getByTitle('${encodeURIComponent(LIST_TITLE)}')`;
+  const fields = await spFetch(`${lu}/fields?$select=Title,InternalName,TypeAsString,Hidden&$top=500`);
+  const map = {}; (fields.value||[]).forEach(f=>{ if(!(f.Title in map)) map[f.Title]=f.InternalName; });
+  const wanted = Object.values(F).filter(k=>k!=="_ID"&&k!=="_HasAttachments"&&k!=="Created"&&k!=="Modified");
+  const sel = ["Id","Created","Modified","Attachments"];
+  const back = {Id:"_ID", Created:"Created", Modified:"Modified", Attachments:"_HasAttachments"};
+  wanted.forEach(disp=>{ const iname=map[disp]; if(iname){ sel.push(iname); back[iname]=disp; } });
+  let url = `${lu}/items?$select=${sel.join(",")}&$orderby=Id desc&$top=5000`, out=[], guard=0;
+  while(url && guard++<20){
+    const j = await spFetch(url);
+    (j.value||[]).forEach(it=>{ const o={}; for(const k in back){ let v=it[k];
+      if(v && typeof v==="object") v = v.Title || v.LookupValue || v.Email || JSON.stringify(v);
+      o[back[k]]= (k==="Attachments") ? !!it[k] : v; } out.push(o); });
+    url = j["odata.nextLink"] || j["@odata.nextLink"] || null;
+  }
+  return out;
+}
+/* แปลง payload แบบ dictionary-encoded -> array ของ object */
+function unpack(p){
+  if(Array.isArray(p)) return p;                       // เผื่อเป็น JSON ธรรมดา
+  if(!p || !p.c || !p.v) throw new Error("รูปแบบข้อมูลไม่ถูกต้อง");
+  const out = new Array(p.n);
+  for(let i=0;i<p.n;i++){
+    const o={};
+    for(let j=0;j<p.c.length;j++){ const ix=p.v[j][i]; o[p.c[j]] = ix<0 ? null : p.d[j][ix]; }
+    out[i]=o;
+  }
+  return out;
+}
+/* ดึงข้อมูลจาก GitHub (ใช้เมื่อกดปุ่มรีเฟรช หรือเลือกแหล่งข้อมูล = GitHub) */
+async function loadGithub(){
+  let last = "";
+  for(const u of ghUrls()){
+    try{
+      const r = await fetch(u, {cache:"no-store"});
+      if(!r.ok){ last = "HTTP "+r.status+" @ "+u.split("?")[0]; continue; }
+      const j = await r.json();
+      const rows = unpack(j.data || j);
+      if(!rows.length) { last = "ได้ข้อมูล 0 แถว @ "+u.split("?")[0]; continue; }
+      GH.builtAt = j.builtAt || "";
+      GH.endpoint = u.split("?")[0];
+      return rows;
+    }catch(e){ last = (e.message||String(e)) + " @ " + u.split("?")[0]; }
+  }
+  throw new Error("ดึงจาก GitHub ไม่สำเร็จ — " + last);
+}
+function loadSnapshot(){
+  const node = document.getElementById("snap");
+  if(!node) throw new Error("ไม่พบบล็อกข้อมูลสำรองในไฟล์ (#snap)");
+  const txt = node.textContent.trim();
+  if(!txt || txt.charAt(0)!=="{") throw new Error("บล็อกข้อมูลสำรองว่างหรือไม่ถูกต้อง");
+  const p = JSON.parse(txt);                       // {c:cols, d:dicts, v:cols of index, n:rows}
+  const out = new Array(p.n);
+  for(let i=0;i<p.n;i++){
+    const o={};
+    for(let j=0;j<p.c.length;j++){ const ix=p.v[j][i]; o[p.c[j]] = ix<0 ? null : p.d[j][ix]; }
+    out[i]=o;
+  }
+  return out;
+}
+function showErr(msg){
+  const b=$("#errBar"); if(!b) return;
+  b.style.display="block"; b.innerHTML = "⚠ "+esc(msg);
+}
+function showInfo(msg){
+  const b=$("#errBar"); if(!b) return;
+  b.style.display="block";
+  b.style.background="rgba(37,99,235,.10)"; b.style.borderColor="rgba(37,99,235,.4)"; b.style.color="var(--info)";
+  b.innerHTML = "ℹ "+esc(msg);
+}
+function hideErr(){
+  const b=$("#errBar"); if(!b) return;
+  b.style.display="none";
+  b.style.background="rgba(217,45,32,.1)"; b.style.borderColor="rgba(217,45,32,.4)"; b.style.color="var(--bad)";
+}
+/* เลือกลำดับแหล่งข้อมูลตามค่าใน #srcMode
+   auto   : SharePoint LIVE -> GitHub -> Snapshot ที่ฝังในไฟล์
+   sp     : SharePoint LIVE เท่านั้น (fallback snapshot)
+   github : GitHub เท่านั้น (fallback snapshot)
+   snap   : ใช้ข้อมูลที่ฝังในไฟล์เท่านั้น                                   */
+function chain(){
+  const m = ($("#srcMode") && $("#srcMode").value) || "auto";
+  const sp = {name:"LIVE",   fn:loadLive};
+  const gh = {name:"GITHUB", fn:loadGithub};
+  const sn = {name:"SNAPSHOT", fn:async()=>loadSnapshot()};
+  if(m==="sp")     return [sp, sn];
+  if(m==="github") return [gh, sn];
+  if(m==="snap")   return [sn];
+  return /sharepoint\.com/i.test(location.hostname) ? [sp, gh, sn] : [gh, sn];
+}
+async function loadData(){
+  $("#srcChip").textContent = "กำลังโหลด…"; hideErr();
+  const errs = [];
+  for(const step of chain()){
+    try{
+      const rows = await step.fn();
+      if(!rows || !rows.length) throw new Error("ได้ข้อมูล 0 แถว");
+      RAW = rows; MODE = step.name;
+      const t = dt(new Date());
+      if(MODE==="LIVE")
+        $("#srcChip").textContent = `LIVE · SharePoint REST · ${RAW.length.toLocaleString()} รายการ · ${t}`;
+      else if(MODE==="GITHUB")
+        $("#srcChip").textContent = `GitHub · ${RAW.length.toLocaleString()} รายการ · ดึงเมื่อ ${t}`;
+      else
+        $("#srcChip").textContent = `SNAPSHOT · ${RAW.length.toLocaleString()} รายการ`;
+      $("#modeNote").textContent =
+        MODE==="LIVE"   ? "LIVE — ดึงสดจาก SharePoint REST API" :
+        MODE==="GITHUB" ? ("GitHub — " + (GH.endpoint||"data.json") + (GH.builtAt?(" · ข้อมูล build เมื่อ "+GH.builtAt):"")) :
+                          "SNAPSHOT — ข้อมูลที่ฝังในไฟล์ ณ SNAPDATE";
+      if(errs.length){
+        const auto = (($("#srcMode")&&$("#srcMode").value)||"auto")==="auto";
+        if(auto && MODE==="SNAPSHOT")
+          showInfo("ออฟไลน์/เข้าถึงแหล่งข้อมูลออนไลน์ไม่ได้ — กำลังแสดงข้อมูลที่ฝังในไฟล์ (ณ SNAPDATE) · กดรีเฟรชเพื่อลองดึงจาก GitHub อีกครั้ง");
+        else
+          showErr("ใช้แหล่งสำรอง ("+MODE+") เพราะแหล่งก่อนหน้าล้มเหลว: "+errs.join(" | "));
+      }
+      buildFilters(); apply();
+      return MODE;
+    }catch(e){ errs.push(step.name+": "+(e && e.message ? e.message : String(e))); }
+  }
+  RAW=[]; $("#srcChip").textContent = "โหลดข้อมูลไม่สำเร็จ";
+  showErr("โหลดข้อมูลไม่สำเร็จทุกแหล่ง — "+errs.join(" | "));
+  buildFilters(); apply();
+  return null;
+}
+
+/* ---------- filters ---------- */
+function uniq(key){ return [...new Set(RAW.map(r=>(r[key]==null?"":String(r[key]).trim())).filter(v=>v))].sort((a,b)=>a.localeCompare(b,"th")); }
+function fillSel(id, key, all){
+  const s=$(id), cur=s.value; s.innerHTML = `<option value="">${all}</option>` + uniq(key).map(v=>`<option>${esc(v)}</option>`).join("");
+  if(cur) s.value=cur;
+}
+function buildFilters(){
+  fillSel("#fStatus",F.status,"ทั้งหมด"); fillSel("#fSDept",F.sDept,"ทั้งหมด");
+  fillSel("#fSProc",F.sProc,"ทั้งหมด");  fillSel("#fSAsset",F.sAsset,"ทั้งหมด");
+  fillSel("#fDept",F.dept,"ทั้งหมด");    fillSel("#fSite",F.site,"ทั้งหมด");
+  fillSel("#fUser",F.user,"ทั้งหมด");    fillSel("#fApprover",F.nDept,"ทั้งหมด");
+  fillSel("#fProcName",F.nProc,"ทั้งหมด");
+}
+const SEARCH_KEYS=[F.title,F.pr,F.empId,F.user,F.dept,F.site,F.note,F.nDept,F.nProc,F.nAsset,F.email,F.status,F.sDept,F.sProc,F.sAsset,F.cDept,F.cProc,F.cAsset,F.id];
+function apply(){
+  const q=norm($("#q").value), terms=q?q.split(/\s+/):[];
+  const f={status:$("#fStatus").value,sd:$("#fSDept").value,sp:$("#fSProc").value,sa:$("#fSAsset").value,
+    dept:$("#fDept").value,site:$("#fSite").value,user:$("#fUser").value,app:$("#fApprover").value,proc:$("#fProcName").value};
+  /* เทียบเป็น "วันแบบไทย" (YYYY-MM-DD) จึงไม่เพี้ยนตามโซนเวลาของเครื่องผู้ใช้ */
+  let from=$("#fFrom").value||null, to=$("#fTo").value||null;
+  const qk=$("#fQuick").value;
+  if(qk){ to=todayKeyBkk(); from=shiftKey(to,-(+qk)+1); }
+  const onlyAtt=$("#onlyAtt").checked;
+  VIEW = RAW.filter(r=>{
+    if(f.status && String(r[F.status]||"")!==f.status) return false;
+    if(f.sd && String(r[F.sDept]||"")!==f.sd) return false;
+    if(f.sp && String(r[F.sProc]||"")!==f.sp) return false;
+    if(f.sa && String(r[F.sAsset]||"")!==f.sa) return false;
+    if(f.dept && String(r[F.dept]||"").trim()!==f.dept) return false;
+    if(f.site && String(r[F.site]||"").trim()!==f.site) return false;
+    if(f.user && String(r[F.user]||"").trim()!==f.user) return false;
+    if(f.app && String(r[F.nDept]||"").trim()!==f.app) return false;
+    if(f.proc && String(r[F.nProc]||"").trim()!==f.proc) return false;
+    if(onlyAtt && !(r[F.att]===true||String(r[F.att]).toLowerCase()==="true")) return false;
+    if(from||to){ const k=dayKey(r[F.created]); if(!k) return false; if(from&&k<from) return false; if(to&&k>to) return false; }
+    if(terms.length){ const hay = SEARCH_KEYS.map(k=>r[k]==null?"":r[k]).join(" ").toLowerCase();
+      for(const t of terms) if(hay.indexOf(t)<0) return false; }
+    return true;
+  });
+  sortView(); page=1; renderAll();
+}
+function sortView(){
+  const k=sortKey, num=[F.title,F.pr,F.empId,F.id].includes(k), date=[F.created,F.modified].includes(k);
+  VIEW.sort((a,b)=>{ let x=a[k],y=b[k];
+    if(date){x=dOnly(x)?dOnly(x).getTime():-1;y=dOnly(y)?dOnly(y).getTime():-1;}
+    else if(num){x=parseFloat(String(x||"").replace(/[^\d.-]/g,""));y=parseFloat(String(y||"").replace(/[^\d.-]/g,""));
+      if(isNaN(x))x=-Infinity;if(isNaN(y))y=-Infinity;}
+    else {x=norm(x);y=norm(y);}
+    return x<y?-1*sortDir:x>y?1*sortDir:0;});
+}
+function activeChips(){
+  const list=[];
+  const add=(l,v,rst)=>{ if(v) list.push({l,v,rst}); };
+  add("ค้นหา",$("#q").value,()=>$("#q").value="");
+  add("สถานะรวม",$("#fStatus").value,()=>$("#fStatus").value="");
+  add("หัวหน้าสายงาน",$("#fSDept").value,()=>$("#fSDept").value="");
+  add("ศูนย์จัดซื้อ",$("#fSProc").value,()=>$("#fSProc").value="");
+  add("บัญชีทรัพย์สิน",$("#fSAsset").value,()=>$("#fSAsset").value="");
+  add("แผนก",$("#fDept").value,()=>$("#fDept").value="");
+  add("Site",$("#fSite").value,()=>$("#fSite").value="");
+  add("ผู้ขอ",$("#fUser").value,()=>$("#fUser").value="");
+  add("ผู้อนุมัติสายงาน",$("#fApprover").value,()=>$("#fApprover").value="");
+  add("ผู้อนุมัติจัดซื้อ",$("#fProcName").value,()=>$("#fProcName").value="");
+  add("ตั้งแต่",$("#fFrom").value,()=>$("#fFrom").value="");
+  add("ถึง",$("#fTo").value,()=>$("#fTo").value="");
+  add("ช่วงเร็ว",$("#fQuick").selectedIndex>0?$("#fQuick").selectedOptions[0].text:"",()=>$("#fQuick").value="");
+  if($("#onlyAtt").checked) list.push({l:"ไฟล์แนบ",v:"เฉพาะที่มี",rst:()=>$("#onlyAtt").checked=false});
+  const c=$("#activeChips"); c.innerHTML = list.map((o,i)=>`<span class="chip"><b>${esc(o.l)}:</b> ${esc(o.v)} <span class="x" data-i="${i}">✕</span></span>`).join("");
+  c.querySelectorAll(".x").forEach(el=>el.onclick=()=>{ list[+el.dataset.i].rst(); apply(); });
+}
+
+/* ---------- KPI + charts ---------- */
+function kpis(){
+  const n=VIEW.length;
+  const cnt=p=>VIEW.filter(p).length;
+  const done=cnt(r=>String(r[F.status])==="ดำเนินการเรียบร้อย");
+  const wait=cnt(r=>String(r[F.status])==="รอดำเนินการ");
+  const cancel=cnt(r=>String(r[F.status])==="ยกเลิก");
+  const rej=cnt(r=>[r[F.sDept],r[F.sProc],r[F.sAsset]].some(v=>String(v||"")==="ไม่อนุมัติ"));
+  const pend=cnt(r=>[r[F.sDept],r[F.sProc],r[F.sAsset]].some(v=>/^รอ/.test(String(v||""))));
+  const att=cnt(r=>r[F.att]===true||String(r[F.att]).toLowerCase()==="true");
+  const pct=v=>n?((v*100/n).toFixed(1)+"%"):"0%";
+  const cards=[
+    {k:"รายการทั้งหมด (ตามตัวกรอง)",v:n.toLocaleString(),d:`จากทั้งหมด ${RAW.length.toLocaleString()} รายการ`,c:"var(--info)",f:null},
+    {k:"ดำเนินการเรียบร้อย",v:done.toLocaleString(),d:pct(done),c:"var(--ok)",f:()=>{$("#fStatus").value="ดำเนินการเรียบร้อย";}},
+    {k:"รอดำเนินการ",v:wait.toLocaleString(),d:pct(wait),c:"var(--warn)",f:()=>{$("#fStatus").value="รอดำเนินการ";}},
+    {k:"ยกเลิก",v:cancel.toLocaleString(),d:pct(cancel),c:"var(--bad)",f:()=>{$("#fStatus").value="ยกเลิก";}},
+    {k:"ค้างรออนุมัติ (ขั้นใดขั้นหนึ่ง)",v:pend.toLocaleString(),d:pct(pend),c:"var(--warn)",f:()=>{$("#fSDept").value="รอหัวหน้าสายงานอนุมัติ";}},
+    {k:"มีรายการไม่อนุมัติ",v:rej.toLocaleString(),d:pct(rej),c:"var(--bad)",f:()=>{$("#fSProc").value="ไม่อนุมัติ";}},
+    {k:"มีไฟล์แนบ",v:att.toLocaleString(),d:pct(att),c:"var(--info)",f:()=>{$("#onlyAtt").checked=true;}}
+  ];
+  $("#kpis").innerHTML = cards.map((c,i)=>`<div class="card" data-i="${i}"><div class="k"><span class="dot" style="background:${c.c}"></span>${esc(c.k)}</div><div class="v">${c.v}</div><div class="d">${esc(c.d)}</div></div>`).join("");
+  $("#kpis").querySelectorAll(".card").forEach(el=>el.onclick=()=>{ const c=cards[+el.dataset.i]; if(c.f){c.f();apply();} });
+}
+const C = {ok:"#12a150", warn:"#e08a00", bad:"#d92d20", info:"#2563eb", brand:"#e2231a", grey:"#94a3b8", purple:"#7c3aed", teal:"#0891b2"};
+function statusColor(s){
+  s=String(s||"").trim();
+  if(/^อนุมัติ$|ดำเนินการเรียบร้อย/.test(s)) return C.ok;
+  if(/^ไม่อนุมัติ$|ยกเลิก/.test(s)) return C.bad;
+  if(/^รอ/.test(s)) return C.warn;
+  return C.grey;
+}
+/* group ทั่วไป -> [[key,count],...] เรียงมากไปน้อย */
+function groupBy(key){
+  const m={}; VIEW.forEach(r=>{const k=String(r[key]==null?"":r[key]).trim()||"(ไม่ระบุ)"; m[k]=(m[k]||0)+1;});
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+}
+/* ตั้งค่าตัวกรองแล้ว apply (ใช้เมื่อคลิกกราฟ) */
+function setFilter(sel, val){ const el=$(sel); if(!el) return; el.value = (el.value===val ? "" : val); apply();
+  toast(el.value? "กรอง: "+val : "ยกเลิกตัวกรองแล้ว"); }
+function setDay(k){ $("#fQuick").value=""; $("#fFrom").value=k; $("#fTo").value=k; apply(); toast("แสดงเฉพาะวันที่ "+k.split("-").reverse().join("/")); }
+
+/* ---------- แถบรายการแนวนอน (คลิกเพื่อกรอง) ---------- */
+function barList(el, pairs, color, filterSel){
+  if(!el) return;
+  const max=Math.max(1,...pairs.map(p=>p[1])), tot=pairs.reduce((a,b)=>a+b[1],0);
+  el.innerHTML = pairs.length? pairs.map(([k,v],i)=>`
+    <div style="margin-bottom:9px;cursor:${filterSel?"pointer":"default"}" data-v="${esc(k)}" class="blrow">
+      <div class="rowlist"><span>${esc(k||"(ไม่ระบุ)")}</span><span class="n">${v.toLocaleString()} · ${tot?(v*100/tot).toFixed(1):0}%</span></div>
+      <div class="bar"><i style="width:${(v*100/max).toFixed(1)}%;background:${typeof color==="function"?color(k):color}"></i></div>
+    </div>`).join("") : '<div class="muted">ไม่มีข้อมูล</div>';
+  if(filterSel) el.querySelectorAll(".blrow").forEach(d=>d.onclick=()=>setFilter(filterSel, d.dataset.v));
+}
+/* ---------- Donut ---------- */
+function donut(el, pairs, centerLabel, filterSel){
+  if(!el) return;
+  const tot=pairs.reduce((a,b)=>a+b[1],0);
+  if(!tot){ el.innerHTML='<div class="muted">ไม่มีข้อมูล</div>'; return; }
+  const R=78, r=50, cx=95, cy=95; let a0=-Math.PI/2, seg="";
+  pairs.forEach(([k,v])=>{
+    const ang=v/tot*Math.PI*2, a1=a0+ang, big=ang>Math.PI?1:0;
+    const P=(rad,a)=>[(cx+rad*Math.cos(a)).toFixed(2),(cy+rad*Math.sin(a)).toFixed(2)];
+    const [x0,y0]=P(R,a0),[x1,y1]=P(R,a1),[x2,y2]=P(r,a1),[x3,y3]=P(r,a0);
+    seg+=`<path class="hit" data-v="${esc(k)}" fill="${statusColor(k)}" d="M${x0},${y0} A${R},${R} 0 ${big},1 ${x1},${y1} L${x2},${y2} A${r},${r} 0 ${big},0 ${x3},${y3} Z"><title>${esc(k)}: ${v.toLocaleString()} (${(v*100/tot).toFixed(1)}%)</title></path>`;
+    a0=a1;
+  });
+  el.innerHTML=`<svg class="ch" viewBox="0 0 190 190" role="img">${seg}
+    <text class="big" x="95" y="92" text-anchor="middle">${tot.toLocaleString()}</text>
+    <text class="sm" x="95" y="108" text-anchor="middle">${esc(centerLabel)}</text></svg>
+    <div class="legend">${pairs.map(([k,v])=>`<span data-v="${esc(k)}"><i style="background:${statusColor(k)}"></i>${esc(k)} <b style="color:var(--fg)">${v.toLocaleString()}</b> (${(v*100/tot).toFixed(1)}%)</span>`).join("")}</div>`;
+  if(filterSel){
+    el.querySelectorAll("path.hit,.legend span").forEach(n=>n.onclick=()=>setFilter(filterSel,n.dataset.v));
+    el.querySelectorAll(".legend span").forEach(n=>n.style.cursor="pointer");
+  }
+}
+/* ---------- แท่งแนวตั้ง (รายวัน / รายชั่วโมง) ---------- */
+function vbars(el, pairs, opt){
+  opt=opt||{};
+  if(!el) return;
+  if(!pairs.length){ el.innerHTML='<div class="muted">ไม่มีข้อมูล</div>'; return; }
+  const W=Math.max(360, pairs.length*Math.max(9,Math.min(26,600/pairs.length))), H=200, pad={l:34,r:8,t:14,b:34};
+  const max=Math.max(1,...pairs.map(p=>p[1]));
+  const bw=(W-pad.l-pad.r)/pairs.length, iw=Math.max(3,bw*0.72);
+  const y=v=>pad.t+(H-pad.t-pad.b)*(1-v/max);
+  let g="";
+  for(let i=0;i<=4;i++){ const v=Math.round(max*i/4), yy=y(v);
+    g+=`<line class="gl" x1="${pad.l}" y1="${yy.toFixed(1)}" x2="${W-pad.r}" y2="${yy.toFixed(1)}"/><text class="sm" x="${pad.l-5}" y="${(yy+3.5).toFixed(1)}" text-anchor="end">${v}</text>`; }
+  const every=Math.ceil(pairs.length/12);
+  const bars=pairs.map(([k,v],i)=>{
+    const x=pad.l+i*bw+(bw-iw)/2, yy=y(v), h=Math.max(v>0?2:0,H-pad.b-yy);
+    const last=opt.hilite&&i===pairs.length-1;
+    const col=last?C.brand:(opt.color||C.info);
+    const lab=(i%every===0||last)?`<text class="sm" transform="translate(${(x+iw/2).toFixed(1)},${H-pad.b+13}) rotate(${opt.rotate||0})" text-anchor="${opt.rotate?"end":"middle"}">${esc(opt.fmt?opt.fmt(k):k)}</text>`:"";
+    return `<g class="hit" data-v="${esc(k)}"><rect x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${iw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${col}"><title>${esc(opt.tip?opt.tip(k):k)}: ${v.toLocaleString()} รายการ</title></rect>${last&&v?`<text class="val" x="${(x+iw/2).toFixed(1)}" y="${(yy-4).toFixed(1)}" text-anchor="middle" fill="${C.brand}">${v}</text>`:""}${lab}</g>`;
+  }).join("");
+  el.innerHTML=`<div style="overflow-x:auto"><svg class="ch" viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W,700)}px">${g}${bars}</svg></div>`;
+  if(opt.onClick) el.querySelectorAll("g.hit").forEach(n=>n.onclick=()=>opt.onClick(n.dataset.v));
+}
+/* ---------- เส้น/พื้นที่ (รายเดือน) ---------- */
+function lineChart(el, pairs){
+  if(!el) return;
+  if(!pairs.length){ el.innerHTML='<div class="muted">ไม่มีข้อมูล</div>'; return; }
+  const W=760,H=210,pad={l:40,r:14,t:18,b:32};
+  const max=Math.max(1,...pairs.map(p=>p[1]));
+  const X=i=>pad.l+(pairs.length<2?(W-pad.l-pad.r)/2:i*(W-pad.l-pad.r)/(pairs.length-1));
+  const Y=v=>pad.t+(H-pad.t-pad.b)*(1-v/max);
+  let g="";
+  for(let i=0;i<=4;i++){ const v=Math.round(max*i/4), yy=Y(v);
+    g+=`<line class="gl" x1="${pad.l}" y1="${yy.toFixed(1)}" x2="${W-pad.r}" y2="${yy.toFixed(1)}"/><text class="sm" x="${pad.l-6}" y="${(yy+3.5).toFixed(1)}" text-anchor="end">${v}</text>`; }
+  const pts=pairs.map((p,i)=>`${X(i).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+  const area=`${pad.l},${H-pad.b} ${pts} ${X(pairs.length-1).toFixed(1)},${H-pad.b}`;
+  const dots=pairs.map((p,i)=>`<g class="hit" data-v="${esc(p[0])}"><circle cx="${X(i).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="4" fill="${C.ok}"><title>${esc(p[0])}: ${p[1].toLocaleString()}</title></circle>
+    <text class="val" x="${X(i).toFixed(1)}" y="${(Y(p[1])-9).toFixed(1)}" text-anchor="middle">${p[1]}</text>
+    <text class="sm" x="${X(i).toFixed(1)}" y="${H-pad.b+15}" text-anchor="middle">${esc(p[0].slice(2))}</text></g>`).join("");
+  el.innerHTML=`<div style="overflow-x:auto"><svg class="ch" viewBox="0 0 ${W} ${H}" style="min-width:520px">${g}
+    <polygon points="${area}" fill="${C.ok}" opacity=".13"/>
+    <polyline points="${pts}" fill="none" stroke="${C.ok}" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg></div>`;
+  el.querySelectorAll("g.hit").forEach(n=>n.onclick=()=>{
+    const k=n.dataset.v, first=k+"-01", [y,m]=k.split("-").map(Number);
+    const lastDay=new Date(Date.UTC(y,m,0)).getUTCDate();
+    $("#fQuick").value=""; $("#fFrom").value=first; $("#fTo").value=`${k}-${p2(lastDay)}`; apply(); toast("แสดงเดือน "+k);
+  });
+}
+/* ---------- แท่งซ้อน: ผลพิจารณาแต่ละขั้น ---------- */
+function stageChart(el){
+  if(!el) return;
+  const stages=[
+    {t:"หัวหน้าสายงาน", k:F.sDept, sel:"#fSDept"},
+    {t:"ศูนย์จัดซื้อทรัพย์สิน", k:F.sProc, sel:"#fSProc"},
+    {t:"บัญชีทรัพย์สิน", k:F.sAsset, sel:"#fSAsset"}
+  ];
+  const rows=stages.map(s=>{
+    const m={}; VIEW.forEach(r=>{const v=String(r[s.k]==null?"":r[s.k]).trim()||"(ไม่ระบุ)"; m[v]=(m[v]||0)+1;});
+    return {...s, parts:Object.entries(m).sort((a,b)=>b[1]-a[1]), tot:VIEW.length};
+  });
+  const W=560, rowH=52, H=rows.length*rowH+14, bx=136, bw=W-bx-58;
+  let out="";
+  rows.forEach((r,i)=>{
+    const y=i*rowH+14; let x=bx;
+    out+=`<text class="lab" x="${bx-8}" y="${y+16}" text-anchor="end" fill="var(--fg)">${esc(r.t)}</text>`;
+    r.parts.forEach(([k,v])=>{
+      const w=r.tot? bw*v/r.tot : 0;
+      out+=`<g class="hit" data-sel="${r.sel}" data-v="${esc(k)}"><rect x="${x.toFixed(1)}" y="${y}" width="${Math.max(0,w).toFixed(1)}" height="22" fill="${statusColor(k)}"><title>${esc(r.t)} · ${esc(k)}: ${v.toLocaleString()} (${(v*100/(r.tot||1)).toFixed(1)}%)</title></rect>${w>34?`<text class="sm" x="${(x+w/2).toFixed(1)}" y="${y+15}" text-anchor="middle" fill="#fff">${v.toLocaleString()}</text>`:""}</g>`;
+      x+=w;
+    });
+    const okv=(r.parts.find(p=>/^อนุมัติ$/.test(p[0]))||["",0])[1];
+    out+=`<text class="sm" x="${bx+bw+6}" y="${y+15}">${r.tot?(okv*100/r.tot).toFixed(0):0}% อนุมัติ</text>`;
+    out+=`<text class="sm" x="${bx}" y="${y+37}">${r.parts.slice(0,3).map(p=>esc(p[0])+" "+p[1].toLocaleString()).join("  ·  ")}</text>`;
+  });
+  el.innerHTML=`<svg class="ch" viewBox="0 0 ${W} ${H}">${out}</svg>`;
+  el.querySelectorAll("g.hit").forEach(n=>n.onclick=()=>setFilter(n.dataset.sel,n.dataset.v));
+}
+/* ---------- ระยะเวลาอนุมัติ ---------- */
+function leadChart(el){
+  if(!el) return;
+  const stages=[
+    {t:"ขอ → หัวหน้าสายงาน", k:F.tDept, c:C.info},
+    {t:"ขอ → ศูนย์จัดซื้อ", k:F.tProc, c:C.purple},
+    {t:"ขอ → บัญชีทรัพย์สิน", k:F.tAsset, c:C.teal}
+  ];
+  const calc=key=>{
+    const arr=[];
+    VIEW.forEach(r=>{ const a=dOnly(r[F.created]), b=dOnly(r[key]); if(!a||!b) return;
+      const h=(b-a)/3600000; if(h>=0 && h<24*365) arr.push(h); });
+    if(!arr.length) return null;
+    arr.sort((x,y)=>x-y);
+    const med=arr.length%2?arr[(arr.length-1)/2]:(arr[arr.length/2-1]+arr[arr.length/2])/2;
+    return {n:arr.length, med, avg:arr.reduce((a,b)=>a+b,0)/arr.length, p90:arr[Math.floor(arr.length*0.9)]};
+  };
+  const data=stages.map(s=>({...s, v:calc(s.k)}));
+  const has=data.filter(d=>d.v);
+  if(!has.length){ el.innerHTML='<div class="muted">ไม่มีข้อมูลเวลาอนุมัติในชุดที่กรอง</div>'; return; }
+  const max=Math.max(...has.map(d=>d.v.p90),1);
+  const W=520, rowH=54, H=data.length*rowH+10, bx=150, bw=W-bx-70;
+  const fmtH=h=> h>=24 ? (h/24).toFixed(1)+" วัน" : h.toFixed(1)+" ชม.";
+  let out="";
+  data.forEach((d,i)=>{
+    const y=i*rowH+16;
+    out+=`<text class="lab" x="${bx-8}" y="${y+14}" text-anchor="end" fill="var(--fg)">${esc(d.t)}</text>`;
+    if(!d.v){ out+=`<text class="sm" x="${bx}" y="${y+14}">ไม่มีข้อมูล</text>`; return; }
+    const wm=bw*d.v.med/max, wa=bw*Math.min(d.v.avg,max)/max, w9=bw*d.v.p90/max;
+    out+=`<rect x="${bx}" y="${y}" width="${w9.toFixed(1)}" height="18" rx="3" fill="${d.c}" opacity=".18"><title>P90 ${fmtH(d.v.p90)}</title></rect>`;
+    out+=`<rect x="${bx}" y="${y}" width="${wa.toFixed(1)}" height="18" rx="3" fill="${d.c}" opacity=".42"><title>เฉลี่ย ${fmtH(d.v.avg)}</title></rect>`;
+    out+=`<rect x="${bx}" y="${y}" width="${wm.toFixed(1)}" height="18" rx="3" fill="${d.c}"><title>มัธยฐาน ${fmtH(d.v.med)}</title></rect>`;
+    out+=`<text class="val" x="${bx+w9+6}" y="${y+14}">${fmtH(d.v.med)}</text>`;
+    out+=`<text class="sm" x="${bx}" y="${y+34}">มัธยฐาน ${fmtH(d.v.med)} · เฉลี่ย ${fmtH(d.v.avg)} · P90 ${fmtH(d.v.p90)} · ${d.v.n.toLocaleString()} รายการ</text>`;
+  });
+  el.innerHTML=`<svg class="ch" viewBox="0 0 ${W} ${H}">${out}</svg>
+    <div class="legend"><span><i style="background:${C.info}"></i>มัธยฐาน</span><span><i style="background:${C.info};opacity:.42"></i>เฉลี่ย</span><span><i style="background:${C.info};opacity:.18"></i>P90 (ช้าสุด 10%)</span></div>`;
+}
+/* ---------- แถบบอกความสดของข้อมูล ---------- */
+function freshness(){
+  const bar=$("#freshBar"); if(!bar) return;
+  if(!RAW.length){ bar.style.display="none"; return; }
+  let maxK="", maxD=null, maxRow=null;
+  RAW.forEach(r=>{ const d=dOnly(r[F.created]); if(d && (!maxD || d>maxD)){ maxD=d; maxRow=r; } });
+  RAW.forEach(r=>{ const d=dOnly(r[F.modified]); if(d && (!maxD || d>maxD)) maxD=d; });
+  if(!maxD){ bar.style.display="none"; return; }
+  maxK = dayKey(maxRow?maxRow[F.created]:maxD);
+  const today=todayKeyBkk();
+  const cToday=RAW.filter(r=>dayKey(r[F.created])===today).length;
+  const cLast=RAW.filter(r=>dayKey(r[F.created])===maxK).length;
+  const ageH=(Date.now()-maxD.getTime())/3600000;
+  bar.className = "fresh" + (ageH>24?" warnbar":"");
+  bar.style.display="flex";
+  bar.innerHTML =
+    `<span>🕒 <b>ข้อมูลล่าสุดในชุดนี้:</b> ${esc(dt(maxD))} น. (เวลาไทย) · เก่ากว่าปัจจุบัน ${ageH<1?Math.round(ageH*60)+" นาที":(ageH<48?ageH.toFixed(1)+" ชม.":(ageH/24).toFixed(1)+" วัน")}</span>
+     <span>· วันล่าสุดที่มีคำขอ <b>${esc(maxK.split("-").reverse().join("/"))}</b> จำนวน <b>${cLast.toLocaleString()}</b> รายการ</span>
+     <span>· วันนี้ (${esc(today.split("-").reverse().join("/"))}) <b>${cToday.toLocaleString()}</b> รายการ</span>
+     <span class="spacer" style="flex:1"></span>
+     <button class="btn" id="btnLastDay">ดูเฉพาะวันล่าสุด</button>
+     <button class="btn" id="btnNewest">ไปรายการใหม่สุด</button>`;
+  $("#btnLastDay").onclick=()=>setDay(maxK);
+  $("#btnNewest").onclick=()=>{ $("#btnClear").onclick(); sortKey=F.created; sortDir=-1; sortView(); page=1; renderAll();
+    setTimeout(()=>{ const t=$("#tbody tr"); if(t) t.scrollIntoView({behavior:"smooth",block:"center"}); },60); toast("เรียงตามวันที่สร้าง ใหม่ → เก่า"); };
+}
+/* ---------- วาดกราฟทั้งหมด ---------- */
+function charts(){
+  if($("#chartArea") && $("#chartArea").style.display==="none") return;
+  /* รายวัน N วันล่าสุด (นับถึงวันล่าสุดที่มีข้อมูล หรือวันนี้ แล้วแต่ตัวไหนใหม่กว่า) */
+  const cnt={}; let maxK="";
+  VIEW.forEach(r=>{ const k=dayKey(r[F.created]); if(!k) return; cnt[k]=(cnt[k]||0)+1; if(k>maxK) maxK=k; });
+  const today=todayKeyBkk(), end=(maxK&&maxK>today)?maxK:today;
+  const N=+($("#chDays")&&$("#chDays").value||30);
+  const days=[]; for(let i=N-1;i>=0;i--){ const k=shiftKey(end,-i); days.push([k, cnt[k]||0]); }
+  vbars($("#chDaily"), days, {color:C.info, hilite:true, rotate:-40,
+    fmt:k=>k.slice(8)+"/"+k.slice(5,7), tip:k=>k.split("-").reverse().join("/"), onClick:setDay});
+  /* รายเดือน */
+  const mm={}; VIEW.forEach(r=>{ const k=monthKey(r[F.created]); if(k) mm[k]=(mm[k]||0)+1; });
+  lineChart($("#chMonth"), Object.entries(mm).sort((a,b)=>a[0].localeCompare(b[0])).slice(-12));
+  /* ตามชั่วโมง (เวลาไทย) */
+  const hh=new Array(24).fill(0);
+  VIEW.forEach(r=>{ const d=dOnly(r[F.created]); if(d) hh[bkkParts(d).H]++; });
+  vbars($("#chHour"), hh.map((v,i)=>[p2(i)+":00", v]), {color:C.purple, fmt:k=>k.slice(0,2), tip:k=>"ช่วงเวลา "+k});
+  /* โดนัท + ขั้นอนุมัติ + lead time */
+  donut($("#chDonut"), groupBy(F.status), "รายการทั้งหมด", "#fStatus");
+  stageChart($("#chFunnel"));
+  leadChart($("#chLead"));
+  /* Top lists */
+  barList($("#chSite"),  groupBy(F.site).slice(0,10), C.info,   "#fSite");
+  barList($("#chDept"),  groupBy(F.dept).slice(0,10), C.teal,   "#fDept");
+  barList($("#chUser"),  groupBy(F.user).slice(0,10), C.purple, "#fUser");
+  barList($("#chProc"),  groupBy(F.nProc).slice(0,10), C.brand, "#fProcName");
+  barList($("#chStatus"),groupBy(F.status), statusColor, "#fStatus");
+}
+
+/* ---------- table ---------- */
+function head(){
+  $("#thead").innerHTML = COLUMNS.map(c=>`<th data-k="${esc(c.k)}">${esc(c.label)} <span class="ar">${sortKey===c.k?(sortDir>0?"▲":"▼"):"⇅"}</span></th>`).join("") + "<th>รายละเอียด</th>";
+  $("#thead").querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sortKey===k) sortDir*=-1; else {sortKey=k;sortDir=1;}
+    sortView(); renderAll();});
+}
+function cell(r,c){
+  const v=r[c.k];
+  if(c.type==="badge") return badge(v);
+  if(c.type==="dt") return esc(dt(v));
+  if(c.type==="att") return (v===true||String(v).toLowerCase()==="true")?'📎':'';
+  if(c.type==="wrap") return `<div class="wrapcell">${esc(v||"")}</div>`;
+  return esc(v==null?"":v);
+}
+function renderTable(){
+  const ps=(+$("#pageSize").value)||50, total=VIEW.length, pages=Math.max(1,Math.ceil(total/ps));
+  page=Math.min(page,pages); const s=(page-1)*ps, rows=VIEW.slice(s,s+ps);
+  $("#tbody").innerHTML = rows.length? rows.map(r=>`<tr data-id="${esc(r[F.id])}">`+
+      COLUMNS.map(c=>`<td${c.type==="wrap"?' class="wrapcell"':""}>${cell(r,c)}</td>`).join("")+
+      `<td><button class="btn" data-open="${esc(r[F.id])}">ดู</button></td></tr>`).join("")
+    : `<tr><td colspan="${COLUMNS.length+1}" class="muted" style="padding:24px;text-align:center">ไม่พบข้อมูลตามเงื่อนไข</td></tr>`;
+  $("#tbody").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openDetail(b.dataset.open));
+  $("#cnt").textContent = `${total.toLocaleString()} รายการ`;
+  $("#pInfo").textContent = `หน้า ${page}/${pages} · แสดง ${rows.length?(s+1):0}-${s+rows.length}`;
+  $("#pFirst").disabled=$("#pPrev").disabled=(page<=1);
+  $("#pNext").disabled=$("#pLast").disabled=(page>=pages);
+  $("#pFirst").onclick=()=>{page=1;renderTable();}; $("#pPrev").onclick=()=>{page--;renderTable();};
+  $("#pNext").onclick=()=>{page++;renderTable();}; $("#pLast").onclick=()=>{page=pages;renderTable();};
+}
+function renderAll(){ head(); kpis(); freshness(); charts(); activeChips(); renderTable(); }
+
+/* ---------- detail ---------- */
+function step(title,name,time,status,comment){
+  return `<div class="step"><h4>${esc(title)}</h4>
+    <div class="kv"><div class="k">ผู้พิจารณา</div><div>${esc(name||"—")}</div>
+    <div class="k">สถานะ</div><div>${badge(status)}</div>
+    <div class="k">เวลา</div><div>${esc(time||"—")}</div>
+    <div class="k">ความเห็น</div><div>${esc(comment||"—")}</div></div></div>`;
+}
+function openDetail(id){
+  const r = VIEW.find(x=>String(x[F.id])===String(id)) || RAW.find(x=>String(x[F.id])===String(id));
+  if(!r) return;
+  $("#sheet").innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px">
+      <h2 style="margin:0;font-size:17px">คำขอเลขที่ ${esc(r[F.title]||("#"+r[F.id]))}</h2>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn" id="closeD">ปิด ✕</button>
+    </div>
+    <div style="margin:10px 0">${badge(r[F.status])} ${r[F.att]===true||String(r[F.att]).toLowerCase()==="true"?'<span class="chip">📎 มีไฟล์แนบ</span>':''}</div>
+    <div class="kv">
+      <div class="k">PR Number</div><div>${esc(r[F.pr]||"—")}</div>
+      <div class="k">รหัสพนักงาน</div><div>${esc(r[F.empId]||"—")}</div>
+      <div class="k">ผู้ขอ</div><div>${esc(r[F.user]||"—")}</div>
+      <div class="k">แผนก</div><div>${esc(r[F.dept]||"—")}</div>
+      <div class="k">สาขา / Site</div><div>${esc(r[F.site]||"—")}</div>
+      <div class="k">ผู้ใช้งาน (Email User)</div><div>${esc(r[F.email]||"—")}</div>
+      <div class="k">หมายเหตุเพิ่มเติม</div><div>${esc(r[F.note]||"—")}</div>
+      <div class="k">วันที่สร้าง</div><div>${esc(dt(r[F.created]))}</div>
+      <div class="k">แก้ไขล่าสุด</div><div>${esc(dt(r[F.modified]))}</div>
+      <div class="k">Item ID</div><div>${esc(r[F.id])}</div>
+    </div>
+    <h3 style="font-size:14px;margin:16px 0 0">ขั้นตอนการอนุมัติ</h3>
+    <div class="steps">
+      ${step("1) หัวหน้าสายงาน", r[F.nDept], r[F.tDept], r[F.sDept], r[F.cDept])}
+      ${step("2) ศูนย์จัดซื้อทรัพย์สิน", r[F.nProc], r[F.tProc], r[F.sProc], r[F.cProc])}
+      ${step("3) บัญชีทรัพย์สิน", r[F.nAsset], r[F.tAsset], r[F.sAsset], r[F.cAsset])}
+    </div>
+    <a class="btn primary" style="text-decoration:none" target="_blank" href="${itemUrl(r[F.id])}">เปิดรายการใน SharePoint ↗</a>`;
+  $("#drawer").classList.add("open");
+  $("#closeD").onclick=()=>$("#drawer").classList.remove("open");
+}
+$("#drawer").onclick = e => { if(e.target.id==="drawer") $("#drawer").classList.remove("open"); };
+
+/* ---------- export ---------- */
+function rowsForExport(){
+  return VIEW.map(r=>{ const o={}; COLUMNS.forEach(c=>{
+      o[c.label] = c.type==="dt"?dt(r[c.k]) : c.type==="att" ? ((r[c.k]===true||String(r[c.k]).toLowerCase()==="true")?"มี":"ไม่มี") : (r[c.k]==null?"":r[c.k]); });
+    o["ความเห็นสายงาน"]=r[F.cDept]||""; o["ความเห็นจัดซื้อ"]=r[F.cProc]||""; o["ความเห็นบัญชีทรัพย์สิน"]=r[F.cAsset]||"";
+    o["ลิงก์รายการ"]=itemUrl(r[F.id]); return o; });
+}
+function dl(blob,name){ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); }
+function stamp(){ const d=new Date(),p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; }
+$("#btnCsv").onclick=()=>{ const rows=rowsForExport(); if(!rows.length) return toast("ไม่มีข้อมูลให้ Export");
+  const h=Object.keys(rows[0]); const q=v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`;
+  const csv="\uFEFF"+[h.map(q).join(","),...rows.map(r=>h.map(k=>q(r[k])).join(","))].join("\r\n");
+  dl(new Blob([csv],{type:"text/csv;charset=utf-8"}),`PO_Approval_${stamp()}.csv`); toast(`Export ${rows.length} รายการแล้ว`); };
+$("#btnXls").onclick=()=>{ const rows=rowsForExport(); if(!rows.length) return toast("ไม่มีข้อมูลให้ Export");
+  const h=Object.keys(rows[0]);
+  const html=`<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><table border="1"><tr>${h.map(k=>`<th>${esc(k)}</th>`).join("")}</tr>${rows.map(r=>`<tr>${h.map(k=>`<td>${esc(r[k])}</td>`).join("")}</tr>`).join("")}</table></body></html>`;
+  dl(new Blob(["\uFEFF"+html],{type:"application/vnd.ms-excel;charset=utf-8"}),`PO_Approval_${stamp()}.xls`); toast(`Export Excel ${rows.length} รายการแล้ว`); };
+$("#btnJson").onclick=()=>{ dl(new Blob([JSON.stringify(VIEW,null,2)],{type:"application/json"}),`PO_Approval_${stamp()}.json`); };
+$("#btnPrint").onclick=()=>window.print();
+
+/* ---------- events ---------- */
+let deb=null;
+$("#q").addEventListener("input",()=>{clearTimeout(deb);deb=setTimeout(apply,200);});
+["#fStatus","#fSDept","#fSProc","#fSAsset","#fDept","#fSite","#fUser","#fApprover","#fProcName","#fFrom","#fTo","#fQuick","#onlyAtt"]
+  .forEach(s=>$(s).addEventListener("change",()=>{ if(s!=="#fQuick"&&$("#fQuick").value&&(s==="#fFrom"||s==="#fTo")) $("#fQuick").value=""; apply();}));
+$("#pageSize").addEventListener("change",()=>{page=1;renderTable();});
+$("#chDays").addEventListener("change",charts);
+$("#btnChToggle").onclick=()=>{ const a=$("#chartArea"), hid=a.style.display==="none";
+  a.style.display=hid?"":"none"; $("#btnChToggle").textContent=hid?"ซ่อนกราฟ":"แสดงกราฟ";
+  try{ localStorage.setItem("po_charts", hid?"1":"0"); }catch(e){}
+  if(hid) charts(); };
+try{ if(localStorage.getItem("po_charts")==="0"){ $("#chartArea").style.display="none"; $("#btnChToggle").textContent="แสดงกราฟ"; } }catch(e){}
+$("#btnClear").onclick=()=>{ $("#q").value=""; ["#fStatus","#fSDept","#fSProc","#fSAsset","#fDept","#fSite","#fUser","#fApprover","#fProcName","#fFrom","#fTo","#fQuick"].forEach(s=>$(s).value=""); $("#onlyAtt").checked=false; apply(); };
+$("#btnRefresh").onclick=async()=>{
+  const b=$("#btnRefresh"); b.disabled=true; const old=b.textContent; b.textContent="⏳ กำลังดึง…";
+  try{
+    const m = await loadData();
+    toast(m ? `อัปเดตข้อมูลแล้ว (${m}) · ${RAW.length.toLocaleString()} รายการ` : "ดึงข้อมูลไม่สำเร็จ");
+  } finally { b.disabled=false; b.textContent=old; }
+};
+$("#srcMode").addEventListener("change",()=>{
+  try{ localStorage.setItem("po_src",$("#srcMode").value); }catch(e){}
+  $("#btnRefresh").onclick();
+});
+try{ const s=localStorage.getItem("po_src"); if(s) $("#srcMode").value=s; }catch(e){}
+$("#btnTheme").onclick=()=>{ const h=document.documentElement, n=h.getAttribute("data-theme")==="dark"?"light":"dark"; h.setAttribute("data-theme",n); try{localStorage.setItem("po_theme",n);}catch(e){} };
+function setAuto(){ if(timer) clearInterval(timer); const s=+$("#autoRef").value; if(s>0) timer=setInterval(()=>loadData(),s*1000); }
+$("#autoRef").addEventListener("change",setAuto);
+try{ const t=localStorage.getItem("po_theme"); if(t) document.documentElement.setAttribute("data-theme",t);}catch(e){}
+
+/* เริ่มทำงานเมื่อ DOM พร้อมเท่านั้น (กันกรณีอ่านบล็อกข้อมูลก่อนที่ DOM จะถูกสร้าง) */
+function init(){
+  loadData().then(setAuto).catch(err=>{ showErr("เริ่มระบบไม่สำเร็จ: "+(err&&err.message?err.message:err)); });
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+window.addEventListener("error", ev=>{ showErr("เกิดข้อผิดพลาดในสคริปต์: "+(ev.message||"")); });
+</script>
+<script type="text/plain" id="snap">__SNAPSHOT_B64__</script>
+</body>
+</html>
