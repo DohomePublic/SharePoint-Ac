@@ -1,0 +1,33 @@
+{
+  "builtAt": "2026-09-02T03:59:48.612Z",
+  "source": "csv",
+  "tookSec": 0.5,
+  "previousRows": 100,
+  "delta": 5660,
+  "htmlBytes": 1766013,
+  "dataBytes": 1701471,
+  "rows": 5760,
+  "latestCreatedBkk": "2026-09-01 11:15",
+  "latestId": "5816",
+  "latestTitle": "6108",
+  "lastDay": "2026-09-01",
+  "lastDayCount": 6,
+  "byStatus": [
+    [
+      "ดำเนินการเรียบร้อย",
+      4883
+    ],
+    [
+      "รอดำเนินการ",
+      631
+    ],
+    [
+      "ยกเลิก",
+      234
+    ],
+    [
+      "(ไม่ระบุ)",
+      12
+    ]
+  ]
+}
