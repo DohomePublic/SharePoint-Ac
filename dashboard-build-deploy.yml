@@ -1,0 +1,90 @@
+name: Dashboard - Build & Deploy
+
+# ------------------------------------------------------------------
+# ทำงาน 3 กรณี
+#   1) push แก้ไข template/สคริปต์ของ dashboard  -> build ใหม่
+#   2) ตารางเวลา ทุกวัน 01:00 UTC (08:00 ไทย)   -> ดึงข้อมูลใหม่จาก SharePoint
+#   3) กดรันเอง (workflow_dispatch)
+# ------------------------------------------------------------------
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dashboard/template.html'
+      - 'scripts/build-snapshot.mjs'
+      - '.github/workflows/dashboard-build-deploy.yml'
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_refresh:
+        description: 'ข้ามการดึงข้อมูลใหม่ (build จาก index.html เดิม)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write      # commit index.html ที่ build ใหม่
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dashboard-deploy
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build dashboard (ดึงข้อมูลจาก SharePoint ผ่าน Microsoft Graph)
+        if: ${{ inputs.skip_refresh != true }}
+        env:
+          AZURE_TENANT_ID:     ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID:     ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          SP_HOSTNAME:  dohomegroup.sharepoint.com
+          SP_SITE_PATH: /sites/AC-Accounting
+          SP_LIST_TITLE: 'AC-Data Request for approval of PO'
+        run: node scripts/build-snapshot.mjs
+
+      - name: ตรวจสอบผลลัพธ์ก่อน deploy
+        run: |
+          test -s dashboard/index.html
+          node -e "
+            const fs=require('fs');
+            const h=fs.readFileSync('dashboard/index.html','utf8');
+            const iData=h.indexOf('id=\"snap\"'), iUse=h.indexOf('function loadSnapshot');
+            if(iData<0) throw new Error('ไม่พบบล็อกข้อมูล #snap');
+            if(iData>iUse) throw new Error('บล็อกข้อมูลอยู่หลังสคริปต์หลัก');
+            const j=JSON.parse(h.match(/id=\"snap\">([\s\S]*?)<\/script>/)[1]);
+            if(!j.n || j.n<1) throw new Error('snapshot ว่าง');
+            console.log('OK rows =', j.n);
+          "
+
+      - name: Commit index.html หากมีการเปลี่ยนแปลง
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add dashboard/index.html
+          git diff --staged --quiet || git commit -m "chore(dashboard): refresh PO approval snapshot [skip ci]"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard
+
+  deploy-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
