@@ -1,4 +1,74 @@
-      - name: Commit & push
+name: Update PO Approval Dashboard
+
+on:
+  schedule:
+    # ทุกวัน 07:00 น. เวลาไทย (00:00 UTC)
+    - cron: "0 0 * * *"
+
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/**"
+      - ".github/workflows/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-dashboard
+  cancel-in-progress: false
+
+env:
+  TZ: Asia/Bangkok
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Start Time
+        run: |
+          echo "🕖 เริ่มรัน: $(TZ=Asia/Bangkok date '+%d/%m/%Y %H:%M:%S ICT')"
+          echo "🌍 UTC: $(date -u '+%d/%m/%Y %H:%M:%S UTC')"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Build Dashboard from SharePoint
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: |
+          for i in 1 2 3; do
+            echo "▶ Attempt $i"
+
+            python scripts/build_dashboard.py -o index.html && break
+
+            if [ "$i" = "3" ]; then
+              echo "❌ ไม่สามารถดึงข้อมูลจาก SharePoint ได้"
+              exit 1
+            fi
+
+            echo "⚠️ Retry in 30 seconds..."
+            sleep 30
+          done
+
+      - name: Commit and Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -6,22 +76,26 @@
           git add index.html
 
           if git diff --staged --quiet; then
-            echo "ℹ️ ข้อมูลไม่เปลี่ยนแปลง — ไม่ต้อง commit"
-            echo "### ℹ️ ข้อมูลไม่เปลี่ยนแปลง" >> $GITHUB_STEP_SUMMARY
+            echo "ℹ️ ไม่มีข้อมูลเปลี่ยนแปลง"
+
+            {
+              echo "### ℹ️ ไม่มีข้อมูลเปลี่ยนแปลง"
+              echo "- Dashboard ไม่มีการอัปเดต"
+            } >> "$GITHUB_STEP_SUMMARY"
+
           else
-            STAMP="$(date '+%d/%m/%Y %H:%M น.')"
+            STAMP=$(TZ=Asia/Bangkok date '+%d/%m/%Y %H:%M น.')
 
             git commit -m "chore: update dashboard $STAMP (ICT)"
             git push
 
-            echo "✅ อัปเดต dashboard แล้ว: $STAMP"
+            echo "✅ Dashboard Updated"
 
             {
-              echo "### ✅ อัปเดต Dashboard สำเร็จ"
-              echo "- เวลา (ไทย): $STAMP"
+              echo "### ✅ Dashboard Updated"
+              echo "- เวลา: $STAMP"
               echo "- ขนาดไฟล์: $(du -h index.html | cut -f1)"
-              echo "- เว็บไซต์: https://dohomepublic.github.io/sharepoint-web/"
+              echo "- Website: https://dohomepublic.github.io/sharepoint-web/"
               echo "- Repository: https://github.com/DohomePublic/SharePoint-Ac"
-            } >> $GITHUB_STEP_SUMMARY
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
-``
