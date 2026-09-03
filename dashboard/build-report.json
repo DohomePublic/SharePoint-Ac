@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-09-02 13:06 UTC",
+  "builtAt": "2026-09-03 01:09 UTC",
   "source": "data.json",
   "tookSec": 0.2,
   "rows": 5788,
@@ -12,8 +12,8 @@
   "latestTitle": "6137",
   "lastDay": "2026-09-02",
   "lastDayCount": 9,
-  "todayBkk": "2026-09-02",
-  "todayCount": 9,
+  "todayBkk": "2026-09-03",
+  "todayCount": 0,
   "byStatus": [
     [
       "ดำเนินการเรียบร้อย",
