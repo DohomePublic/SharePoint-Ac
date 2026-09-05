@@ -1,15 +1,17 @@
 name: Update PO Approval Dashboard
 
+# ═══════════════════════════════════════════════════════════════
+# ⏰ ตั้งเวลารันอัตโนมัติ: ทุกวัน 07:00 น. (เวลาไทย ICT / UTC+7)
+#    GitHub Actions ใช้ UTC เสมอ → 07:00 ไทย = 00:00 UTC
+#    cron format:  นาที ชั่วโมง วันที่ เดือน วันในสัปดาห์
+# ═══════════════════════════════════════════════════════════════
+
 on:
   schedule:
-    # ทุกวัน 07:00 น. เวลาไทย (00:00 UTC)
-    - cron: "0 0 * * *"
-
-  workflow_dispatch:
-
+    - cron: "0 0 * * *"       # ทุกวัน 00:00 UTC = 07:00 น. เวลาไทย
+  workflow_dispatch:           # กดรันเองได้จากแท็บ Actions
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "scripts/**"
       - ".github/workflows/**"
@@ -33,10 +35,50 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show Start Time
+      - name: แสดงเวลาที่เริ่มรัน
         run: |
-          echo "🕖 เริ่มรัน: $(TZ=Asia/Bangkok date '+%d/%m/%Y %H:%M:%S ICT')"
-          echo "🌍 UTC: $(date -u '+%d/%m/%Y %H:%M:%S UTC')"
+          echo "🕖 เริ่มรัน: $(date '+%d/%m/%Y %H:%M:%S %Z') (เวลาไทย)"
+          echo "   UTC     : $(date -u '+%d/%m/%Y %H:%M:%S UTC')"
+
+      # ── ตรวจ Secrets ก่อน ถ้าไม่ครบให้หยุดทันที พร้อมบอกว่าตัวไหนขาด ──
+      - name: ตรวจสอบ GitHub Secrets
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: |
+          fail=0
+          check() {
+            name="$1"; val="$2"
+            if [ -z "$val" ]; then
+              echo "::error::ไม่พบ secret: $name"
+              echo "- ❌ \`$name\` — **ยังไม่ได้ตั้งค่า**" >> $GITHUB_STEP_SUMMARY
+              fail=1
+            else
+              echo "✅ $name ตั้งค่าแล้ว (ยาว ${#val} ตัวอักษร)"
+              echo "- ✅ \`$name\` — ตั้งค่าแล้ว (${#val} ตัวอักษร)" >> $GITHUB_STEP_SUMMARY
+            fi
+          }
+          check AZURE_TENANT_ID     "$AZURE_TENANT_ID"
+          check AZURE_CLIENT_ID     "$AZURE_CLIENT_ID"
+          check AZURE_CLIENT_SECRET "$AZURE_CLIENT_SECRET"
+          if [ "$fail" = "1" ]; then
+            {
+              echo ""
+              echo "### 👉 วิธีแก้"
+              echo "ไปที่ **Settings > Secrets and variables > Actions > New repository secret**"
+              echo "แล้วเพิ่มให้ครบ 3 ตัว (ต้องอยู่แท็บ **Secrets** ไม่ใช่ **Variables**):"
+              echo ""
+              echo "| ชื่อ Secret | ค่า |"
+              echo "|---|---|"
+              echo "| \`AZURE_TENANT_ID\` | \`7f8918d9-718a-495b-ac9a-17cba381c4a0\` |"
+              echo "| \`AZURE_CLIENT_ID\` | \`012ac5e6-9487-4436-9e0e-246c19ab2a67\` |"
+              echo "| \`AZURE_CLIENT_SECRET\` | ค่า Client Secret จาก Azure AD |"
+              echo ""
+              echo "⚠️ ชื่อต้องสะกดตรงเป๊ะ ตัวพิมพ์ใหญ่ทั้งหมด และห้ามมีช่องว่างหน้า/หลังค่า"
+            } >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -44,58 +86,42 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
+        run: pip install --upgrade requests
 
-      - name: Build Dashboard from SharePoint
+      - name: Build dashboard from SharePoint
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: |
           for i in 1 2 3; do
-            echo "▶ Attempt $i"
-
+            echo "▶ ครั้งที่ $i"
             python scripts/build_dashboard.py -o index.html && break
-
-            if [ "$i" = "3" ]; then
-              echo "❌ ไม่สามารถดึงข้อมูลจาก SharePoint ได้"
-              exit 1
+            rc=$?
+            if [ "$rc" = "78" ]; then
+              echo "::error::ตั้งค่า Secrets ไม่ถูกต้อง — หยุดโดยไม่ลองซ้ำ"; exit 1
             fi
-
-            echo "⚠️ Retry in 30 seconds..."
-            sleep 30
+            if [ "$i" = "3" ]; then
+              echo "::error::ดึงข้อมูลจาก SharePoint ไม่สำเร็จหลังลอง 3 ครั้ง"; exit 1
+            fi
+            echo "⚠ ล้มเหลว (exit $rc) รอ 30 วินาทีแล้วลองใหม่..."; sleep 30
           done
 
-      - name: Commit and Push
+      - name: Commit & push
         run: |
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
           git add index.html
-
           if git diff --staged --quiet; then
-            echo "ℹ️ ไม่มีข้อมูลเปลี่ยนแปลง"
-
-            {
-              echo "### ℹ️ ไม่มีข้อมูลเปลี่ยนแปลง"
-              echo "- Dashboard ไม่มีการอัปเดต"
-            } >> "$GITHUB_STEP_SUMMARY"
-
+            echo "ℹ️ ข้อมูลไม่เปลี่ยนแปลง — ไม่ต้อง commit"
+            echo "### ℹ️ ข้อมูลไม่เปลี่ยนแปลง" >> $GITHUB_STEP_SUMMARY
           else
-            STAMP=$(TZ=Asia/Bangkok date '+%d/%m/%Y %H:%M น.')
-
+            STAMP="$(date '+%d/%m/%Y %H:%M น.')"
             git commit -m "chore: update dashboard $STAMP (ICT)"
             git push
-
-            echo "✅ Dashboard Updated"
-
-            {
-              echo "### ✅ Dashboard Updated"
-              echo "- เวลา: $STAMP"
-              echo "- ขนาดไฟล์: $(du -h index.html | cut -f1)"
-              echo "- Website: https://dohomepublic.github.io/sharepoint-web/"
-              echo "- Repository: https://github.com/DohomePublic/SharePoint-Ac"
-            } >> "$GITHUB_STEP_SUMMARY"
+            echo "✅ อัปเดต dashboard แล้ว: $STAMP"
+            echo "### ✅ อัปเดต dashboard สำเร็จ" >> $GITHUB_STEP_SUMMARY
+            echo "- เวลา (ไทย): $STAMP" >> $GITHUB_STEP_SUMMARY
+            echo "- ขนาดไฟล์: $(du -h index.html | cut -f1)" >> $GITHUB_STEP_SUMMARY
           fi
+          echo "- 🔗 https://dohomepublic.github.io/sharepoint-web/" >> $GITHUB_STEP_SUMMARY
