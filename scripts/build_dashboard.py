@@ -28,11 +28,11 @@ LIST_NAME = "AC-Data Request for approval of PO"
 
 # ---- mapping: key ที่ใช้ใน dashboard -> ชื่อ internal field ที่เป็นไปได้ ----
 FIELDS = {
-    "id":           ["ID"],
-    "title":        ["Title"],
-    "idno":         ["id_x0020_number", "idnumber", "id number"],
-    "user":         ["user_x0020_name", "username", "user name"],
-    "dept":         ["Department"],
+    "id":           ["ID", "id", "_ID"],
+    "title":        ["Title", "LinkTitle"],
+    "idno":         ["id_x0020_number", "idnumber", "id number", "id_number"],
+    "user":         ["user_x0020_name", "username", "user name", "user_name"],
+    "dept":         ["Department", "Department0", "Dept", "หน่วยงาน"],
     "pr":           ["PR_x0020_Number", "PRNumber"],
     "note":         ["Additional_x0020_Notes", "AdditionalNotes"],
     "head_name":    ["Name_x0020_Department_x0020_Head", "NameDepartmentHead"],
@@ -97,6 +97,35 @@ def graph_get(url, token):
     return r.json()
 
 
+def norm_key(s):
+    """ทำให้ชื่อคอลัมน์เทียบกันได้: ตัด _x0020_ / ช่องว่าง / _ / ตัวพิมพ์"""
+    s = str(s or "").replace("_x0020_", " ")
+    return "".join(ch for ch in s.lower() if ch.isalnum())
+
+
+def fetch_columns(site_id, list_id, token):
+    """คืน dict: normalize(displayName หรือ internal name) -> internal name จริง"""
+    try:
+        data = graph_get(
+            f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_id}"
+            f"/columns?$top=300", token)
+    except Exception as e:
+        print(f"   ⚠ อ่าน /columns ไม่ได้ ({e}) — จะใช้การเดาชื่อคอลัมน์แทน",
+              file=sys.stderr)
+        return {}
+    m = {}
+    for c in data.get("value", []):
+        internal = c.get("name") or ""
+        if not internal:
+            continue
+        for label in (c.get("displayName"), internal):
+            k = norm_key(label)
+            if k and k not in m:
+                m[k] = internal
+    print(f"   อ่านชื่อคอลัมน์จากลิสต์ได้ {len(m):,} รายการ")
+    return m
+
+
 def fetch_items(token):
     site = graph_get(
         f"https://graph.microsoft.com/v1.0/sites/{SITE_HOST}:{SITE_PATH}", token)
@@ -112,21 +141,37 @@ def fetch_items(token):
     if not list_id:
         raise SystemExit(f"❌ ไม่พบ List ชื่อ '{LIST_NAME}' ใน site {SITE_PATH}")
 
+    colmap = fetch_columns(site_id, list_id, token)
+
     url = (f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_id}"
            f"/items?expand=fields&$top=1000")
     rows, page = [], 0
     while url:
         data = graph_get(url, token)
         for it in data.get("value", []):
-            rows.append(it.get("fields", {}))
+            f = dict(it.get("fields", {}) or {})
+            # Graph คืนเลขที่รายการที่ระดับ item ด้วย — ใช้เป็น fallback ของ ID
+            if not f.get("ID") and not f.get("id"):
+                f["ID"] = it.get("id", "")
+            rows.append(f)
         page += 1
         print(f"   ดึงข้อมูลหน้า {page} — สะสม {len(rows):,} รายการ")
         url = data.get("@odata.nextLink")
-    return rows
+    return rows, colmap
 
 
-def pick(f, names):
-    """หาค่าจาก field ตามชื่อที่เป็นไปได้หลายแบบ"""
+def flat(v):
+    if isinstance(v, dict):
+        return (v.get("DisplayName") or v.get("displayName") or v.get("Email")
+                or v.get("email") or v.get("LookupValue") or v.get("Label") or "")
+    if isinstance(v, list):
+        return ", ".join(str(flat(x)) for x in v if flat(x) != "")
+    return v
+
+
+def pick(f, names, colmap=None, nf=None):
+    """หาค่าจาก field ตามชื่อที่เป็นไปได้หลายแบบ
+    1) เทียบชื่อตรงตัว  2) เทียบผ่าน map displayName->internal  3) เทียบแบบ normalize"""
     for n in names:
         if n in f and f[n] not in (None, ""):
             v = f[n]
@@ -136,12 +181,50 @@ def pick(f, names):
                 return ", ".join(
                     (x.get("DisplayName") or x.get("Email") or "") if isinstance(x, dict)
                     else str(x) for x in v)
-            return v
+            return flat(v)
+    if colmap:
+        for n in names:
+            real = colmap.get(norm_key(n))
+            if real and f.get(real) not in (None, ""):
+                return flat(f[real])
+    if nf is None:
+        nf = {norm_key(k): k for k in f}
+    for n in names:
+        real = nf.get(norm_key(n))
+        if real and f.get(real) not in (None, ""):
+            return flat(f[real])
     return ""
 
 
-def normalize(fields_rows):
-    return [{k: pick(f, names) for k, names in FIELDS.items()} for f in fields_rows]
+def normalize(fields_rows, colmap=None):
+    out = []
+    for f in fields_rows:
+        nf = {norm_key(k): k for k in f}
+        out.append({k: pick(f, names, colmap, nf) for k, names in FIELDS.items()})
+    return out
+
+
+def report_fields(recs, sample_keys=None):
+    """เตือนถ้าคอลัมน์ไหนดึงมาแล้วว่างเกือบทั้งหมด"""
+    if not recs:
+        return
+    n = len(recs)
+    empty = [(k, sum(1 for r in recs if not str(r.get(k) or "").strip()))
+             for k in FIELDS]
+    bad = [(k, c) for k, c in empty if c >= n * 0.9]
+    if not bad:
+        print("   ✅ ดึงข้อมูลได้ครบทุกคอลัมน์")
+        return
+    print("\n   ⚠ คอลัมน์ต่อไปนี้ว่างเกือบทั้งหมด (อาจตั้งชื่อ internal name ไม่ตรง):",
+          file=sys.stderr)
+    for k, c in bad:
+        print(f"      - {k:12s} ว่าง {c:,}/{n:,} แถว  (ลองชื่อ: {', '.join(FIELDS[k])})",
+              file=sys.stderr)
+    if sample_keys:
+        print(f"\n   ชื่อคอลัมน์จริงที่ Graph ส่งกลับมา ({len(sample_keys)} คอลัมน์):",
+              file=sys.stderr)
+        print("      " + ", ".join(sorted(sample_keys)), file=sys.stderr)
+        print("   👉 นำชื่อที่ถูกต้องไปใส่ใน FIELDS ด้านบนของสคริปต์นี้", file=sys.stderr)
 
 
 # --------------------------------------------------------------------------
@@ -227,9 +310,55 @@ def clean_pr(v):
 # --------------------------------------------------------------------------
 # 4) สร้าง HTML
 # --------------------------------------------------------------------------
+NO_DEPT = "(ไม่ระบุหน่วยงาน)"
+
+
+def backfill_dept(rows):
+    """คอลัมน์ Department ในลิสต์ต้นทางว่างอยู่จำนวนมาก
+    -> เติมจากคำขออื่นของพนักงานคนเดียวกัน (รหัสพนักงาน > อีเมล > ชื่อ)
+    คืนค่า (จำนวนที่เติมได้, จำนวนที่ยังว่าง)"""
+    from collections import defaultdict
+    maps = [defaultdict(Counter) for _ in range(3)]
+    keys = ("idno", "email", "user")
+    for r in rows:
+        d = clean(r.get("dept"))
+        if not d:
+            continue
+        for m, k in zip(maps, keys):
+            kv = clean(r.get(k))
+            if kv:
+                m[kv][d] += 1
+
+    filled = blank = 0
+    for r in rows:
+        if clean(r.get("dept")):
+            r["dept_guess"] = ""
+            continue
+        got = ""
+        for m, k in zip(maps, keys):
+            kv = clean(r.get(k))
+            if kv and m.get(kv):
+                got = m[kv].most_common(1)[0][0]
+                break
+        if got:
+            r["dept"] = got
+            r["dept_guess"] = "1"
+            filled += 1
+        else:
+            r["dept"] = NO_DEPT
+            r["dept_guess"] = "?"
+            blank += 1
+    return filled, blank
+
+
 def build_html(rows):
     now = datetime.now(TZ)
     rows = sorted(rows, key=sort_key, reverse=True)
+
+    n_fill, n_blank = backfill_dept(rows)
+    if n_fill or n_blank:
+        print(f"   หน่วยงาน: เติมให้อัตโนมัติ {n_fill:,} รายการ · "
+              f"ยังไม่ทราบ {n_blank:,} รายการ (แสดงเป็น '{NO_DEPT}')")
 
     recs = []
     for r in rows:
@@ -239,6 +368,7 @@ def build_html(rows):
             "idno": clean_pr(r.get("idno")),
             "user": clean(r.get("user")),
             "dept": clean(r.get("dept")),
+            "dg": r.get("dept_guess", ""),
             "pr": clean_pr(r.get("pr")),
             "note": clean(r.get("note")),
             "status": clean(r.get("status")) or "-",
@@ -392,6 +522,9 @@ tbody tr:hover{{background:var(--o50)}}
 .mini-r>i{{background:#dc2626}}
 .mini-g>i{{background:#16a34a}}
 .hint{{font-size:12px;color:var(--muted);margin-top:10px}}
+.gs{{display:inline-block;font-size:10px;padding:0 5px;border-radius:5px;
+  background:var(--o100);color:var(--o700);margin-left:5px;vertical-align:middle;cursor:help}}
+.gq{{color:#c9b0a0;font-style:italic}}
 .stg{{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;
   background:var(--o50);color:var(--o800);margin-left:4px;white-space:nowrap}}
 .old{{color:#dc2626;font-weight:700}}
@@ -570,6 +703,10 @@ const pill = s => s===S_DONE ? "p-done" : s===S_WAIT ? "p-wait" : s===S_CANCEL ?
 const apr  = s => !s ? "p-na" : s.indexOf("ไม่อนุมัติ")>=0 ? "p-no"
                  : s.indexOf("อนุมัติ")>=0 ? "p-ok" : "p-pend";
 const dash = v => (v && v.toString().trim()) ? esc(v) : '<span style="color:#c9b0a0">—</span>';
+const NO_DEPT = {json.dumps(NO_DEPT, ensure_ascii=False)};
+const deptCell = r => r.dg==='?' ? `<span class="gq">${{NO_DEPT}}</span>`
+  : r.dg==='1' ? `${{esc(r.dept)}}<span class="gs" title="ต้นทางไม่ได้ระบุหน่วยงาน — อนุมานจากคำขออื่นของพนักงานคนเดียวกัน">≈</span>`
+  : dash(r.dept);
 
 /* ---------- ตาราง ---------- */
 let ALLCOL = false;
@@ -595,7 +732,7 @@ function render(){{
     '<th style="width:80px">รายละเอียด</th></tr>';
   document.getElementById('tb').innerHTML = cur.slice(0,shown).map((r,i)=>`<tr data-i="${{i}}">
     <td>${{dash(r.id)}}</td><td>${{dash(r.created)}}</td><td>${{dash(r.user)}}</td>
-    <td>${{dash(r.dept)}}</td><td>${{dash(r.pr)}}</td><td>${{dash(r.site)}}</td>
+    <td>${{deptCell(r)}}</td><td>${{dash(r.pr)}}</td><td>${{dash(r.site)}}</td>
     <td><span class="pill ${{pill(r.status)}}">${{esc(r.status)}}</span>${{r.stg?`<br><span class="stg">⏳ ${{esc(r.own)}} · ${{r.age}} วัน</span>`:''}}</td>
     ${{ALLCOL ? MORE.map(c=>`<td>${{c[1](r)}}</td>`).join('') : ''}}
     <td><button class="btn-view" data-i="${{i}}">👁 ดู</button></td></tr>`).join('');
@@ -666,7 +803,12 @@ function openDetail(r, i){{
       <dt>ผู้ขออนุมัติ</dt><dd>${{dash(r.user)}}</dd>
       <dt>รหัสพนักงาน</dt><dd>${{dash(r.idno)}}</dd>
       <dt>อีเมล</dt><dd>${{dash(r.email)}}</dd>
-      <dt>หน่วยงาน</dt><dd>${{dash(r.dept)}}</dd>
+      <dt>หน่วยงาน</dt><dd>${{deptCell(r)}}${{r.dg==='1'
+        ? '<div style="font-size:12px;color:var(--muted);margin-top:3px">'
+          + '≈ ต้นทางไม่ได้ระบุหน่วยงาน ระบบอนุมานจากคำขออื่นของพนักงานคนนี้</div>'
+        : r.dg==='?'
+        ? '<div style="font-size:12px;color:var(--muted);margin-top:3px">'
+          + 'ไม่พบข้อมูลหน่วยงานของพนักงานคนนี้ในลิสต์</div>' : ''}}</dd>
       <dt>สาขา / Site</dt><dd>${{dash(r.site)}}</dd>
       <dt>วันที่สร้าง</dt><dd>${{dash(r.created)}}</dd>
       <dt>แก้ไขล่าสุด</dt><dd>${{dash(r.modified)}}</dd>
@@ -966,6 +1108,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", help="สร้าง dashboard จากไฟล์ CSV แทน Graph API")
     ap.add_argument("-o", "--out", default="index.html")
+    ap.add_argument("--dump-fields", action="store_true",
+                    help="แสดงชื่อคอลัมน์จริงทั้งหมดจาก SharePoint แล้วจบการทำงาน")
     a = ap.parse_args()
 
     if a.csv:
@@ -985,9 +1129,25 @@ def main():
                   "   ต้องเป็น *Repository secrets* (ไม่ใช่ Variables / ไม่ใช่ Environment secrets)\n"
                   "   และชื่อต้องสะกดตรงเป๊ะ ตัวพิมพ์ใหญ่ทั้งหมด", file=sys.stderr)
             sys.exit(78)
-        rows = normalize(fetch_items(
+        raw, colmap = fetch_items(
             get_token(env["AZURE_TENANT_ID"], env["AZURE_CLIENT_ID"],
-                      env["AZURE_CLIENT_SECRET"])))
+                      env["AZURE_CLIENT_SECRET"]))
+        if a.dump_fields:
+            keys = sorted({k for f in raw[:200] for k in f})
+            print(f"\n📋 ชื่อคอลัมน์จริงใน SharePoint ({len(keys)} คอลัมน์):")
+            for k in keys:
+                sample = ""
+                for f in raw[:200]:
+                    if str(f.get(k) or "").strip():
+                        sample = str(flat(f[k]))[:60]
+                        break
+                print(f"   {k:55s} | ตัวอย่าง: {sample}")
+            print(f"\n📋 map displayName -> internal name ({len(colmap)}):")
+            for k, v in sorted(colmap.items()):
+                print(f"   {k:40s} -> {v}")
+            return
+        rows = normalize(raw, colmap)
+        report_fields(rows, {k for f in raw[:200] for k in f})
 
     with open(a.out, "w", encoding="utf-8") as fh:
         fh.write(build_html(rows))
