@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "0 0 * * *"       # ทุกวัน 00:00 UTC = 07:00 น. เวลาไทย
   workflow_dispatch:           # กดรันเองได้จากแท็บ Actions
+    inputs:
+      dump_fields:
+        description: "ตรวจชื่อคอลัมน์จริงใน SharePoint (ไม่สร้าง index.html)"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -88,7 +93,24 @@ jobs:
       - name: Install dependencies
         run: pip install --upgrade requests
 
+      - name: ตรวจชื่อคอลัมน์จริงใน SharePoint (เมื่อเลือก dump_fields)
+        if: inputs.dump_fields
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: |
+          python scripts/build_dashboard.py --dump-fields | tee /tmp/fields.txt
+          {
+            echo "## 📋 ชื่อคอลัมน์จริงใน SharePoint"
+            echo ""
+            echo '```'
+            cat /tmp/fields.txt
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
       - name: Build dashboard from SharePoint
+        if: ${{ !inputs.dump_fields }}
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -96,8 +118,9 @@ jobs:
         run: |
           for i in 1 2 3; do
             echo "▶ ครั้งที่ $i"
-            python scripts/build_dashboard.py -o index.html && break
-            rc=$?
+            python scripts/build_dashboard.py -o index.html 2>&1 | tee /tmp/build.log
+            rc=${PIPESTATUS[0]}
+            [ "$rc" = "0" ] && break
             if [ "$rc" = "78" ]; then
               echo "::error::ตั้งค่า Secrets ไม่ถูกต้อง — หยุดโดยไม่ลองซ้ำ"; exit 1
             fi
@@ -107,7 +130,25 @@ jobs:
             echo "⚠ ล้มเหลว (exit $rc) รอ 30 วินาทีแล้วลองใหม่..."; sleep 30
           done
 
+      - name: เตือนเมื่อมีคอลัมน์ที่ดึงไม่ได้
+        if: ${{ !inputs.dump_fields }}
+        run: |
+          if grep -q "ว่างเกือบทั้งหมด" /tmp/build.log 2>/dev/null; then
+            echo "::warning::มีคอลัมน์ที่ดึงข้อมูลไม่ได้ — ดูรายละเอียดใน Job Summary"
+            {
+              echo "## ⚠ คอลัมน์ที่ดึงข้อมูลไม่ได้"
+              echo ""
+              echo '```'
+              sed -n '/ว่างเกือบทั้งหมด/,$p' /tmp/build.log
+              echo '```'
+              echo ""
+              echo "👉 กดรัน workflow ใหม่โดยติ๊ก **dump_fields** เพื่อดูชื่อคอลัมน์จริง"
+            } >> $GITHUB_STEP_SUMMARY
+          fi
+          grep -E "หน่วยงาน:|อ่านชื่อคอลัมน์" /tmp/build.log >> $GITHUB_STEP_SUMMARY || true
+
       - name: Commit & push
+        if: ${{ !inputs.dump_fields }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
